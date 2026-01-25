@@ -1,0 +1,120 @@
+@page {
+  size: 13.333in 7.5in;
+  margin: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #111111;
+  margin: 0;
+}
+
+.page {
+  width: 100%;
+  height: 100%;
+  padding: 0.6in 0.75in;
+  page-break-after: always;
+}
+
+.page:last-child {
+  page-break-after: auto;
+}
+
+h1 {
+  font-size: 32px;
+  margin: 0 0 12px 0;
+}
+
+h2 {
+  font-size: 24px;
+  margin: 0 0 12px 0;
+}
+
+.header .meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 20px;
+  margin-bottom: 12px;
+}
+
+.footer {
+  position: absolute;
+  bottom: 0.5in;
+  left: 0.75in;
+  font-size: 12px;
+  color: #555555;
+}
+
+.cover .content p {
+  margin: 10px 0;
+}
+
+.distribution .totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.distribution .total {
+  border: 1px solid #d0d0d0;
+  padding: 8px;
+  text-align: center;
+}
+
+.distribution .total .label {
+  font-weight: bold;
+  font-size: 12px;
+  color: #555555;
+}
+
+.distribution .total .value {
+  font-size: 18px;
+  margin-top: 4px;
+}
+
+.distribution-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+
+.distribution-table th,
+.distribution-table td {
+  border: 1px solid #d0d0d0;
+  padding: 6px;
+  text-align: center;
+}
+
+.distribution-table th {
+  background: #f5f5f5;
+}
+
+.distribution-table .group {
+  text-align: left;
+  font-weight: bold;
+}
+
+.note {
+  font-size: 12px;
+  color: #444444;
+}
+
+.meal p,
+.static p {
+  margin: 10px 0;
+}
+
+.slide-text {
+  white-space: pre-line;
+  font-size: 11px;
+  line-height: 1.25;
+  border: 1px solid #d0d0d0;
+  padding: 8px;
+}

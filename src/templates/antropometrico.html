@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <title>Informe Antropométrico</title>
+  </head>
+  <body>
+    <section class="page cover">
+      <div class="center">
+        <h1>INFORME ANTROPOMÉTRICO</h1>
+      </div>
+    </section>
+
+    <section class="page intro">
+      <p><strong>Caracas, {{ data.eval_date }}</strong></p>
+      <p>
+        La evaluación antropométrica (a través de la cineantropometría) es una herramienta que permite analizar
+        la influencia de varios factores que afectan las características morfológicas y la composición corporal
+        de individuos o deportistas físicamente activos, lo que directamente tendrá influencia en el entrenamiento,
+        recuperación y nutrición.
+      </p>
+      <p>
+        La realización de un perfil antropométrico permite obtener valores correspondientes a los componentes
+        estructurales más importantes del cuerpo, los cuales son: músculo, grasa y hueso, datos de suma importancia
+        al momento de realizar una intervención dietética específica.
+      </p>
+      <p>
+        La evaluación se lleva a cabo bajo el protocolo de marcaje y medición indicado por la International Society
+        for the Advancement in Kinanthropometric (ISAK), en condiciones normales de temperatura, en un área con
+        suficiente espacio y buena iluminación.
+      </p>
+      <p>
+        Las variables tomadas en cuenta fueron: masa corporal, talla, talla sentado, pliegues cutáneos, perímetros
+        musculares y diámetros óseos.
+      </p>
+      <div class="signature">
+        <div><strong>SAMUEL OCHOA</strong></div>
+        <div>UCV-MPPS: 5489</div>
+        <div>Antropometrista ISAK Nivel 2</div>
+        <div>Certificate #638578814603302690</div>
+      </div>
+    </section>
+
+    <section class="page summary">
+      <div class="summary-grid">
+        <div><strong>Nombre:</strong> {{ data.patient.name }}</div>
+        <div><strong>Disciplina:</strong> {{ data.patient.discipline }}</div>
+        <div><strong>Edad:</strong> {{ data.patient.age }}</div>
+        <div><strong>CI:</strong> {{ data.patient.ci }}</div>
+        <div><strong>Objetivo:</strong> ____________________</div>
+      </div>
+
+      <p>
+        Los hallazgos de la evaluación antropométrica describen su composición corporal con un peso corporal de
+        {{ "%.2f"|format(data.weight_kg) }} kg y una estatura de {{ "%.2f"|format(data.height_m) }} m para la actualidad,
+        lo cual representa un índice de masa corporal de {{ "%.2f"|format(data.bmi) }} ({{ data.bmi_class }}).
+      </p>
+      <p>
+        En cuanto a la masa magra se obtuvo un valor de {{ "%.2f"|format(data.lean_mass_kg) }} kg. El porcentaje de
+        grasa es de {{ "%.2f"|format(data.body_fat_pct) }}% (Carter 1986).
+      </p>
+
+      <div class="summary-box">
+        <div class="box-title">Tabla antropométrica resumen</div>
+        <div class="box-grid">
+          <div><strong>Somatotipo:</strong> {{ data.somatotype }}</div>
+          <div><strong>Masa grasa:</strong> {{ "%.2f"|format(data.fat_mass_kg) }} kg</div>
+          <div><strong>Próximo control:</strong> {{ data.next_control }}</div>
+        </div>
+      </div>
+
+      <div class="blank-section">
+        <div><strong>Metas nutricionales:</strong> ______________________________________</div>
+        <div><strong>Diagnóstico antropométrico:</strong> ________________________________</div>
+        <div><strong>Observaciones:</strong> ____________________________________________</div>
+        <div><strong>Meta final:</strong> ______________________________________________</div>
+      </div>
+    </section>
+
+    <section class="page table">
+      <h2>Tabla 1. Valores antropométricos del paciente</h2>
+      <p>Fuente: elaboración propia, privada.</p>
+      <table class="measurements">
+        <thead>
+          <tr>
+            <th>Variable</th>
+            <th>Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in data.measurements %}
+            <tr>
+              <td>{{ item.label }}</td>
+              <td>{{ item.value }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="page recommendations">
+      <h2>Recomendaciones (actividad física)</h2>
+      <p>
+        Garantizar al menos 4 sesiones de entrenamiento a la semana. Es importante que consideres que si bien la
+        prioridad es la programación de musculación, los trabajos de resistencia aeróbica (cardio) deben ser añadidos
+        al menos 3 veces por semana.
+      </p>
+      <p>
+        Trabajar en rangos de hipertrofia, tanto en repeticiones como en porcentaje de peso manejado (8-12 repeticiones,
+        80-85% del RM).
+      </p>
+      <p>
+        Distribuir los grupos musculares de forma óptima: días de push (pecho, hombros, tríceps), pull (espalda, trapecios,
+        bíceps) y piernas.
+      </p>
+      <p>
+        Realiza al menos 2 veces por semana ejercicios destinados a mejorar tu movilidad y disminuir el riesgo de lesiones.
+      </p>
+      <p>
+        Trata de moverte lo más posible durante el día. Recuerda que mientras más activo te mantengas mejor responderá tu
+        cuerpo a la pérdida de grasa.
+      </p>
+      <div class="blank-section">
+        <div><strong>Observaciones:</strong> ____________________________________________</div>
+        <div><strong>Fecha de próximo control:</strong> {{ data.next_control }}</div>
+        <div><strong>Recuerda que debes reservar tu cupo.</strong></div>
+      </div>
+    </section>
+
+    <section class="page recommendations">
+      <h2>Recomendaciones (actividad física)</h2>
+      <p>
+        Incluye dentro de tu entrenamiento ejercicios para la zona abdominal, estos te ayudarán a fortalecer tu abdomen
+        y harán diferencia en cuanto a postura.
+      </p>
+      <p>
+        Realiza al menos 2 veces por semana ejercicios destinados a mejorar tu movilidad y disminuir el riesgo de lesiones.
+      </p>
+      <p>
+        Trata de moverte lo más posible durante el día. Recuerda que mientras más activo te mantengas mejor responderá tu
+        cuerpo a la pérdida de grasa.
+      </p>
+      <p>
+        Garantizar en la medida de lo posible un descanso óptimo, irte a dormir antes de las 10:30 pm. Importantísimo.
+      </p>
+      <p>
+        Apegarse lo más posible a las indicaciones nutricionales reflejadas en el plan de alimentación.
+      </p>
+      <div class="blank-section">
+        <div><strong>Observaciones:</strong> ____________________________________________</div>
+        <div><strong>Fecha de próximo control:</strong> {{ data.next_control }}</div>
+      </div>
+    </section>
+  </body>
+</html>

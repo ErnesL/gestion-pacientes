@@ -1,0 +1,12 @@
+# Ignorar videos pesados
+*.MOV
+*.mp4
+Source material/
+Oferta inicial/
+
+# Ignorar entornos virtuales (si usas Python)
+venv/
+__pycache__/
+
+# Ignorar carpetas de sistema
+.DS_Store
