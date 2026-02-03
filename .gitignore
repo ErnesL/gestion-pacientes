@@ -1,7 +1,7 @@
 # Ignorar videos pesados
 *.MOV
 *.mp4
-Source material/
+# Source material/
 Oferta inicial/
 
 # Ignorar entornos virtuales (si usas Python)

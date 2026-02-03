@@ -3,22 +3,34 @@
   margin: 0;
 }
 
+:root {
+  --ink: #0e1b2b;
+  --muted: #4a596c;
+  --accent: #1b6f7a;
+  --accent-dark: #0f3d44;
+  --accent-soft: #e6f5f6;
+  --mist: #f5f7fb;
+  --shadow: 0 16px 40px rgba(14, 27, 43, 0.12);
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
-  font-family: Arial, sans-serif;
-  font-size: 14px;
+  font-family: "Trebuchet MS", "Gill Sans", "Verdana", sans-serif;
+  font-size: 13px;
   line-height: 1.4;
-  color: #111111;
+  color: var(--ink);
   margin: 0;
 }
 
 .page {
+  position: relative;
   width: 100%;
   height: 100%;
-  padding: 0.7in 0.8in;
+  padding: 0.7in 0.8in 0.9in;
+  background: var(--mist);
   page-break-after: always;
 }
 
@@ -26,69 +38,262 @@ body {
   page-break-after: auto;
 }
 
-h1 {
-  font-size: 32px;
-  margin: 0;
+.cover {
+  background: linear-gradient(135deg, #0f2a3c 0%, #143b53 45%, #1f4e6a 100%);
+  color: #ffffff;
+  padding: 0;
 }
 
-h2 {
-  font-size: 22px;
-  margin: 0 0 12px 0;
-}
-
-.cover .center {
+.cover .cover-grid {
   display: flex;
-  align-items: center;
-  justify-content: center;
   height: 100%;
 }
 
-.signature {
-  margin-top: 24px;
-  font-size: 12px;
+.cover .cover-text {
+  flex: 0 0 55%;
+  padding: 0.9in;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
 }
 
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 18px;
+.cover .cover-text h1 {
+  font-size: 34px;
+  margin: 0;
+}
+
+.cover .cover-text p {
+  margin: 0;
+  color: #d8e8f3;
+}
+
+.cover .cover-photo {
+  flex: 1;
+  background: url("assets/antropometrico/portada.jpeg") center/cover no-repeat;
+}
+
+.cover .logo-mark {
+  height: 60px;
+}
+
+.intro {
+  background: #ffffff;
+}
+
+.intro .intro-grid {
+  display: flex;
+  align-items: flex-start;
+}
+
+.intro .intro-card {
+  flex: 0 0 62%;
+  margin-right: 20px;
+  background: #f7fafc;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+
+.intro .profile {
+  flex: 0 0 36%;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.intro .profile img {
+  width: 100%;
+  border-radius: 16px;
+}
+
+.badges {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.badges img {
+  height: 38px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 12px;
 }
 
-.summary-box {
-  border: 1px solid #d0d0d0;
-  padding: 10px;
-  margin: 14px 0;
+.section-header h2 {
+  margin: 0;
+  font-size: 22px;
 }
 
-.summary-box .box-title {
-  font-weight: bold;
+.section-header .tag {
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.summary {
+  background: linear-gradient(135deg, #ffffff 0%, #eef4fb 100%);
+}
+
+.summary .summary-grid {
+  display: flex;
+}
+
+.summary .summary-grid > div:first-child {
+  width: 42%;
+  margin-right: 18px;
+}
+
+.summary .summary-grid > div:last-child {
+  width: 56%;
+}
+
+.summary .patient-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.summary .patient-card > div {
+  width: 48%;
   margin-bottom: 8px;
 }
 
-.summary-box .box-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 18px;
+.summary .patient-card strong {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
 }
 
-.blank-section div {
-  margin: 6px 0;
+.summary .metrics {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.metric-card {
+  width: 48%;
+  margin-bottom: 12px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: var(--shadow);
+}
+
+.metric-card .label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.metric-card .value {
+  font-size: 18px;
+  margin-top: 4px;
+  font-weight: bold;
+}
+
+.avatar {
+  width: 140px;
+  height: 140px;
+  border-radius: 999px;
+  background: #ffffff;
+  padding: 10px;
+  box-shadow: var(--shadow);
+  margin-bottom: 10px;
+}
+
+.summary .summary-text {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.table {
+  background: #ffffff;
+}
+
+.table h2 {
+  margin: 0 0 10px 0;
+  font-size: 22px;
 }
 
 .measurements {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 10px;
+  font-size: 12px;
+  box-shadow: var(--shadow);
 }
 
 .measurements th,
 .measurements td {
-  border: 1px solid #d0d0d0;
-  padding: 6px 8px;
+  padding: 8px 10px;
   text-align: left;
 }
 
 .measurements th {
-  background: #f5f5f5;
+  background: var(--accent);
+  color: #ffffff;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.6px;
+}
+
+.measurements tr:nth-child(even) td {
+  background: #f3f7fb;
+}
+
+.recommendations {
+  background: linear-gradient(135deg, #ffffff 0%, #f0f5fb 100%);
+}
+
+.recommendations .rec-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.rec-card {
+  width: 49%;
+  margin-bottom: 14px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+
+.rec-card h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--accent-dark);
+}
+
+.rec-footer {
+  margin-top: 16px;
+  background: var(--accent-soft);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.rec-footer img {
+  width: 22px;
+  height: 22px;
+  margin-right: 8px;
 }

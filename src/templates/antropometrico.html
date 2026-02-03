@@ -6,74 +6,115 @@
   </head>
   <body>
     <section class="page cover">
-      <div class="center">
-        <h1>INFORME ANTROPOMÉTRICO</h1>
+      <div class="cover-grid">
+        <div class="cover-text">
+          <img class="logo-mark" src="assets/antropometrico/logo.png" alt="Logo">
+          <h1>Informe Antropométrico</h1>
+          <p>Evaluación profesional de composición corporal y metas nutricionales.</p>
+          <p><strong>Caracas, {{ data.eval_date }}</strong></p>
+        </div>
+        <div class="cover-photo"></div>
       </div>
     </section>
 
     <section class="page intro">
-      <p><strong>Caracas, {{ data.eval_date }}</strong></p>
-      <p>
-        La evaluación antropométrica (a través de la cineantropometría) es una herramienta que permite analizar
-        la influencia de varios factores que afectan las características morfológicas y la composición corporal
-        de individuos o deportistas físicamente activos, lo que directamente tendrá influencia en el entrenamiento,
-        recuperación y nutrición.
-      </p>
-      <p>
-        La realización de un perfil antropométrico permite obtener valores correspondientes a los componentes
-        estructurales más importantes del cuerpo, los cuales son: músculo, grasa y hueso, datos de suma importancia
-        al momento de realizar una intervención dietética específica.
-      </p>
-      <p>
-        La evaluación se lleva a cabo bajo el protocolo de marcaje y medición indicado por la International Society
-        for the Advancement in Kinanthropometric (ISAK), en condiciones normales de temperatura, en un área con
-        suficiente espacio y buena iluminación.
-      </p>
-      <p>
-        Las variables tomadas en cuenta fueron: masa corporal, talla, talla sentado, pliegues cutáneos, perímetros
-        musculares y diámetros óseos.
-      </p>
-      <div class="signature">
-        <div><strong>SAMUEL OCHOA</strong></div>
-        <div>UCV-MPPS: 5489</div>
-        <div>Antropometrista ISAK Nivel 2</div>
-        <div>Certificate #638578814603302690</div>
+      <div class="intro-grid">
+        <div class="intro-card">
+          <p>
+            La evaluación antropométrica (a través de la cineantropometría) es una herramienta que permite analizar
+            la influencia de factores que afectan las características morfológicas y la composición corporal.
+          </p>
+          <p>
+            Este perfil brinda valores de músculo, grasa y hueso, datos de suma importancia para una intervención
+            dietética específica. La evaluación se llevó a cabo bajo protocolo ISAK, en condiciones normales de
+            temperatura, con instrumentos certificados.
+          </p>
+          <p>
+            Variables consideradas: masa corporal, talla, pliegues cutáneos, perímetros musculares y diámetros óseos.
+          </p>
+          <div class="badges">
+            <img src="assets/antropometrico/certificacion.png" alt="ISAK">
+            <img src="assets/antropometrico/logo.png" alt="Logo">
+          </div>
+        </div>
+
+        <div class="profile">
+          <img src="assets/antropometrico/nutricionista.png" alt="Nutricionista">
+          <p><strong>Samuel Ochoa</strong></p>
+          <p>UCV-MPPS: 5489</p>
+          <p>Antropometrista ISAK Nivel 2</p>
+          <p>Certificate #638578814603302690</p>
+        </div>
       </div>
     </section>
 
     <section class="page summary">
       <div class="summary-grid">
-        <div><strong>Nombre:</strong> {{ data.patient.name }}</div>
-        <div><strong>Disciplina:</strong> {{ data.patient.discipline }}</div>
-        <div><strong>Edad:</strong> {{ data.patient.age }}</div>
-        <div><strong>CI:</strong> {{ data.patient.ci }}</div>
-        <div><strong>Objetivo:</strong> ____________________</div>
-      </div>
-
-      <p>
-        Los hallazgos de la evaluación antropométrica describen su composición corporal con un peso corporal de
-        {{ "%.2f"|format(data.weight_kg) }} kg y una estatura de {{ "%.2f"|format(data.height_m) }} m para la actualidad,
-        lo cual representa un índice de masa corporal de {{ "%.2f"|format(data.bmi) }} ({{ data.bmi_class }}).
-      </p>
-      <p>
-        En cuanto a la masa magra se obtuvo un valor de {{ "%.2f"|format(data.lean_mass_kg) }} kg. El porcentaje de
-        grasa es de {{ "%.2f"|format(data.body_fat_pct) }}% (Carter 1986).
-      </p>
-
-      <div class="summary-box">
-        <div class="box-title">Tabla antropométrica resumen</div>
-        <div class="box-grid">
-          <div><strong>Somatotipo:</strong> {{ data.somatotype }}</div>
-          <div><strong>Masa grasa:</strong> {{ "%.2f"|format(data.fat_mass_kg) }} kg</div>
-          <div><strong>Próximo control:</strong> {{ data.next_control }}</div>
+        <div>
+          <img class="avatar" src="{% if data.patient.sex.lower().startswith('f') %}assets/antropometrico/image13.png{% else %}assets/antropometrico/image16.png{% endif %}" alt="Perfil">
+          <div class="patient-card">
+            <div>
+              <strong>Nombre</strong>
+              <div>{{ data.patient.name }}</div>
+            </div>
+            <div>
+              <strong>Disciplina</strong>
+              <div>{{ data.patient.discipline or "____________________" }}</div>
+            </div>
+            <div>
+              <strong>Edad</strong>
+              <div>{{ data.patient.age }}</div>
+            </div>
+            <div>
+              <strong>CI</strong>
+              <div>{{ data.patient.ci }}</div>
+            </div>
+            <div>
+              <strong>Objetivo</strong>
+              <div>____________________</div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div class="blank-section">
-        <div><strong>Metas nutricionales:</strong> ______________________________________</div>
-        <div><strong>Diagnóstico antropométrico:</strong> ________________________________</div>
-        <div><strong>Observaciones:</strong> ____________________________________________</div>
-        <div><strong>Meta final:</strong> ______________________________________________</div>
+        <div>
+          <div class="metrics">
+            <div class="metric-card">
+              <div class="label">Peso</div>
+              <div class="value">{{ "%.2f"|format(data.weight_kg) }} kg</div>
+            </div>
+            <div class="metric-card">
+              <div class="label">Estatura</div>
+              <div class="value">{{ "%.2f"|format(data.height_m) }} m</div>
+            </div>
+            <div class="metric-card">
+              <div class="label">IMC</div>
+              <div class="value">{{ "%.2f"|format(data.bmi) }} ({{ data.bmi_class }})</div>
+            </div>
+            <div class="metric-card">
+              <div class="label">% Grasa</div>
+              <div class="value">{{ "%.2f"|format(data.body_fat_pct) }}%</div>
+            </div>
+            <div class="metric-card">
+              <div class="label">Masa magra</div>
+              <div class="value">{{ "%.2f"|format(data.lean_mass_kg) }} kg</div>
+            </div>
+            <div class="metric-card">
+              <div class="label">Masa grasa</div>
+              <div class="value">{{ "%.2f"|format(data.fat_mass_kg) }} kg</div>
+            </div>
+          </div>
+
+          <div class="summary-text">
+            Somatotipo: <strong>{{ data.somatotype }}</strong> | Próximo control: <strong>{{ data.next_control }}</strong>
+          </div>
+
+          <div class="summary-text">
+            Metas nutricionales: ________________________________<br>
+            Diagnóstico antropométrico: __________________________<br>
+            Observaciones: ______________________________________<br>
+            Meta final: _________________________________________
+          </div>
+        </div>
       </div>
     </section>
 
@@ -99,56 +140,60 @@
     </section>
 
     <section class="page recommendations">
-      <h2>Recomendaciones (actividad física)</h2>
-      <p>
-        Garantizar al menos 4 sesiones de entrenamiento a la semana. Es importante que consideres que si bien la
-        prioridad es la programación de musculación, los trabajos de resistencia aeróbica (cardio) deben ser añadidos
-        al menos 3 veces por semana.
-      </p>
-      <p>
-        Trabajar en rangos de hipertrofia, tanto en repeticiones como en porcentaje de peso manejado (8-12 repeticiones,
-        80-85% del RM).
-      </p>
-      <p>
-        Distribuir los grupos musculares de forma óptima: días de push (pecho, hombros, tríceps), pull (espalda, trapecios,
-        bíceps) y piernas.
-      </p>
-      <p>
-        Realiza al menos 2 veces por semana ejercicios destinados a mejorar tu movilidad y disminuir el riesgo de lesiones.
-      </p>
-      <p>
-        Trata de moverte lo más posible durante el día. Recuerda que mientras más activo te mantengas mejor responderá tu
-        cuerpo a la pérdida de grasa.
-      </p>
-      <div class="blank-section">
-        <div><strong>Observaciones:</strong> ____________________________________________</div>
-        <div><strong>Fecha de próximo control:</strong> {{ data.next_control }}</div>
-        <div><strong>Recuerda que debes reservar tu cupo.</strong></div>
+      <div class="section-header">
+        <h2>Recomendaciones (actividad física)</h2>
+        <div class="tag">Entrenamiento</div>
+      </div>
+      <div class="rec-grid">
+        <div class="rec-card">
+          <h3>Frecuencia</h3>
+          <p>Garantizar al menos 4 sesiones de entrenamiento a la semana.</p>
+        </div>
+        <div class="rec-card">
+          <h3>Cardio</h3>
+          <p>Agregar resistencia aeróbica al menos 3 veces por semana (HIIT + LISS).</p>
+        </div>
+        <div class="rec-card">
+          <h3>Hipertrofia</h3>
+          <p>Trabajar en rangos de 8-12 repeticiones con 80-85% del RM.</p>
+        </div>
+        <div class="rec-card">
+          <h3>Movilidad</h3>
+          <p>Al menos 2 sesiones por semana para mejorar rangos y prevenir lesiones.</p>
+        </div>
+      </div>
+      <div class="rec-footer">
+        <img src="assets/antropometrico/calendario.png" alt="Calendario">
+        <div>Fecha de próximo control: <strong>{{ data.next_control }}</strong></div>
       </div>
     </section>
 
     <section class="page recommendations">
-      <h2>Recomendaciones (actividad física)</h2>
-      <p>
-        Incluye dentro de tu entrenamiento ejercicios para la zona abdominal, estos te ayudarán a fortalecer tu abdomen
-        y harán diferencia en cuanto a postura.
-      </p>
-      <p>
-        Realiza al menos 2 veces por semana ejercicios destinados a mejorar tu movilidad y disminuir el riesgo de lesiones.
-      </p>
-      <p>
-        Trata de moverte lo más posible durante el día. Recuerda que mientras más activo te mantengas mejor responderá tu
-        cuerpo a la pérdida de grasa.
-      </p>
-      <p>
-        Garantizar en la medida de lo posible un descanso óptimo, irte a dormir antes de las 10:30 pm. Importantísimo.
-      </p>
-      <p>
-        Apegarse lo más posible a las indicaciones nutricionales reflejadas en el plan de alimentación.
-      </p>
-      <div class="blank-section">
-        <div><strong>Observaciones:</strong> ____________________________________________</div>
-        <div><strong>Fecha de próximo control:</strong> {{ data.next_control }}</div>
+      <div class="section-header">
+        <h2>Recomendaciones (actividad física)</h2>
+        <div class="tag">Seguimiento</div>
+      </div>
+      <div class="rec-grid">
+        <div class="rec-card">
+          <h3>Zona abdominal</h3>
+          <p>Incluye ejercicios para fortalecer el abdomen y mejorar postura.</p>
+        </div>
+        <div class="rec-card">
+          <h3>Movimiento diario</h3>
+          <p>Muévete lo más posible durante el día para apoyar la pérdida de grasa.</p>
+        </div>
+        <div class="rec-card">
+          <h3>Descanso</h3>
+          <p>Descanso óptimo: intenta dormir antes de las 10:30 pm.</p>
+        </div>
+        <div class="rec-card">
+          <h3>Plan nutricional</h3>
+          <p>Apegarse lo más posible a las indicaciones nutricionales del plan.</p>
+        </div>
+      </div>
+      <div class="rec-footer">
+        <img src="assets/antropometrico/calendario.png" alt="Calendario">
+        <div>Observaciones: ____________________________________________</div>
       </div>
     </section>
   </body>

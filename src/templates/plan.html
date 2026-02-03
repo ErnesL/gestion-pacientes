@@ -1,496 +1,549 @@
 <!doctype html>
 <html lang="es">
   <head>
-    <meta charset="utf-8">
+    <meta charset="utf-8" />
     <title>Plan de Alimentacion</title>
   </head>
   <body>
-    {% set meals = ["Pre Desayuno", "Desayuno", "Merienda AM", "Almuerzo", "Merienda PM", "Cena"] %}
-    {% set groups = ["Lácteos", "Vegetales", "Frutas", "Almidones", "Proteínas", "Grasas"] %}
+    {% set lacteos = [ '1 taza de leche (ml/gramos): 240', '¾ taza de yogurt
+    firme (ml/gramos): 150', '2 ½ cdas de leche en polvo (ml/gramos): 35', '1
+    unidad de yogurt tipo griego (yolo-yogpro-boom)' ] %} {% set frutas = ['1
+    ración de frutas enteras/jugo'] %} {% set almidones_desayuno = [ '1 arepa
+    pequeña (ml/gramos): 50 (80 cruda) Pesar crudo 25-30 g por encima', '1 reb
+    de pan cuadrado integral/blanco (ml/gramos): 30', '¼ plátano (horneado,
+    sacochado/ airfryer) (ml/gramos): 50', '1 fajita/tortilla de trigo/maíz/yuca
+    o similar (tipo bimbo o crustissimo)', '1 trozo de batata-apio-yuca-ocumo o
+    similar (ml/gramos): 80', '1 papa mediana (ml/gramos): 100', '1 trozo o 5
+    rueditas de casabe (ml/gramos): 25', '¼ taza de avena o crema de arroz o
+    similar (ml/gramos): 20' ] %} {% set almidones_merienda = [ '2 torticas de
+    arroz inflado', '1 reb de pan cuadrado integral/blanco (ml/gramos): 30', '¼
+    plátano (horneado, sacochado/ airfryer) (ml/gramos): 50', '1 fajita/tortilla
+    de trigo/maíz/yuca o similar (tipo bimbo o crustissimo)', '1 barrita/s de
+    cereal (Avelina o Natural Valley)', '1 paquete/s de galleta tipo soda o
+    similar', '1 trozo o 5 rueditas de casabe (ml/gramos): 25', '¼ taza de avena
+    o crema de arroz o similar (ml/gramos): 20', '½ taza de cereal (tipo corn
+    flakes o similar) (ml/gramos): 25', '¼ taza de granola (20 g)' ] %} {% set
+    almidones_principal = [ '½ taza de arroz (ml/gramos): 80', '½ taza de pasta
+    (ml/gramos): 70', '¼ plátano (horneado, sacochado/ airfryer) (ml/gramos):
+    50', '1 fajita/tortilla de trigo/maíz/yuca o similar (tipo bimbo o
+    crustissimo)', '1 trozo de batata-apio-yuca-ocumo o similar (ml/gramos):
+    80', '1 papa mediana (ml/gramos): 100', '1 trozo o 5 rueditas de casabe
+    (ml/gramos): 25', '1 taza de puré de papa, apio, ñame u ocumo (ml/gramos):
+    80-100', '¼ taza de quínoa (ml/gramos): 40', '1 unidad de cachapa peq.
+    (ml/gramos): 50' ] %} {% set proteinas_base = [ '1 reb/lonja de queso
+    (ml/gramos): 30', '1 reb/lonja de pechuga de pavo (ml/gramos): 30', '1 huevo
+    entero (clara + amarilla)', '1 trozo/2 cdas de carne pollo o pescado
+    (ml/gramos): 30', 'Atún o sardina (ml/gramos): 35', '1 scoop de proteína
+    (ml/gramos): 30-35 NO MULTIPLICAR' ] %} {% set proteinas_principal = [ '1
+    trozo/2 cdas de carne pollo, pescado/lomo de cerdo (ml/gramos): 30', '1
+    huevo entero (clara + amarilla)', '1 reb/lonja de pechuga de pavo
+    (ml/gramos): 30', 'Atún o sardina (ml/gramos): 35', '1 scoop de proteína
+    (ml/gramos): 30-35 NO MULTIPLICAR', '1 reb/lonja de queso (ml/gramos): 30',
+    'Mariscos o frutos del mar (ml/gramos): 30', 'CUALQUIER OTRA OPCIÓN DEBES
+    CONSULTAR' ] %} {% set grasas_base = [ '1 lonja/s de aguacate (ml/gramos):
+    30', '1 lonja/s tocineta (ml/gramos): 10', '1 cucharadita/s de aceite
+    (oliva, aguacate, coco o similar) (ml/gramos): 5', '2 cdta/s de mantequilla
+    de maní, almendras o similar (ml/gramos): 10', '1 cda/s de semillas de
+    ajonjolí o chía', 'Aceitunas (ml/gramos): 30', '1 cucharadita/s de
+    mantequilla (ml/gramos): 5', 'CUALQUIER OTRA OPCIÓN DEBES CONSULTAR' ] %} {%
+    set grasas_merienda = [ '½ puño de frutos secos (ml/gramos): 10', '6
+    almendras/merey', '1 cucharadita/s de aceite (oliva, aguacate, coco o
+    similar) (ml/gramos): 5', '2 cdta/s de mantequilla de maní, almendras o
+    similar (ml/gramos): 10', '1 cda/s de semillas de ajonjolí o chía', '2 cdas
+    de coco rallado', '6 unidades de pistacho / semillas de calabaza',
+    'CUALQUIER OTRA OPCIÓN DEBES CONSULTAR' ] %} {% set vegetales = [ 'Taza de
+    vegetales crudos: (pepino, repollo, lechuga, celery, tomate, zanahoria,
+    cebolla, palmito). Lo ideal es elaborar una ensalada con la mezcla de
+    ellos.', 'Taza de vegetales cocidos o en crema: (auyama, cebolla, zanahoria,
+    remolacha, vainitas, berenjena, calabacín, espinacas, coliflor, brócoli,
+    acelga).' ] %} {% set menu_pages = [ { 'title': 'DESAYUNO', 'time': '6:00 -
+    8:00', 'meal_key': 'Desayuno', 'columns':
+    ['Lácteos','Frutas','Almidones','Proteínas','Grasas'], 'options': [lacteos,
+    frutas, almidones_desayuno, proteinas_base, grasas_base], 'example':
+    'EJEMPLO: 3 huevos revueltos + 3 reb. de pan + 1 lonja de aguacate + 1
+    manzana', 'note': 'Para alcanzar 180 g de pollo debes pesar 210-220 g
+    crudos' }, { 'title': 'MERIENDA', 'time': '9:30 - 10:30', 'meal_key':
+    'Merienda AM', 'columns':
+    ['Lácteos','Frutas','Almidones','Proteínas','Grasas'], 'options': [lacteos,
+    frutas, almidones_merienda, proteinas_base, grasas_merienda], 'example':
+    'EJEMPLO: 3 huevos revueltos + 3 reb. de pan + 1 lonja de aguacate + 1
+    manzana', 'note': '' }, { 'title': 'ALMUERZO', 'time': '12:00 - 13:00',
+    'meal_key': 'Almuerzo', 'columns':
+    ['Vegetales','Frutas','Almidones','Proteínas','Grasas'], 'options':
+    [vegetales, frutas, almidones_principal, proteinas_principal, grasas_base],
+    'example': 'EJEMPLO: 3 huevos revueltos + 3 reb. de pan + 1 lonja de
+    aguacate + 1 manzana', 'note': '' }, { 'title': 'MERIENDA', 'time': '15:00 -
+    16:00', 'meal_key': 'Merienda PM', 'columns':
+    ['Lácteos','Frutas','Almidones','Proteínas','Grasas'], 'options': [lacteos,
+    frutas, almidones_merienda, proteinas_base, grasas_merienda], 'example':
+    'EJEMPLO: 3 huevos revueltos + 3 reb. de pan + 1 lonja de aguacate + 1
+    manzana', 'note': '' }, { 'title': 'CENA', 'time': '19:00 - 20:00',
+    'meal_key': 'Cena', 'columns':
+    ['Vegetales','Frutas','Almidones','Proteínas','Grasas'], 'options':
+    [vegetales, frutas, almidones_principal, proteinas_principal, grasas_base],
+    'example': 'EJEMPLO: 3 huevos revueltos + 3 reb. de pan + 1 lonja de
+    aguacate + 1 manzana', 'note': '' } ] %}
 
-    <section class="page cover">
-      <div class="header">
-        <h1>PLAN DE ALIMENTACIÓN</h1>
-        <div class="meta">
-          <div><strong>Paciente:</strong> {{ data.patient.name }}</div>
-          <div><strong>Disciplina:</strong> {{ data.patient.discipline }}</div>
-          <div><strong>Objetivo:</strong> ____________________</div>
-          <div><strong>Sexo:</strong> {{ data.patient.sex }}</div>
-          <div><strong>Edad:</strong> {{ data.patient.age }}</div>
+    <section class="page">
+      <div class="header-row">
+        <img class="logo" src="assets/plan/logo.png" alt="Logo" />
+        <div class="photo-wrap">
+          <img src="assets/plan/nutricionista.jpg" alt="Nutricionista" />
+          <div class="license">UCV-MPPS: 5489</div>
         </div>
       </div>
-      <div class="content">
-        <p>
-          A continuación te presento tu plan de alimentación. Lo primero que debes conocer es que el mismo
-          está diseñado tomando en cuenta todos y cada uno de los datos y resultados obtenidos en la consulta,
-          por lo tanto es <strong>PERSONAL E INDIVIDUAL</strong>, lo que indica que no le será funcional a otra persona.
-        </p>
-        <p>
-          Inicialmente debes conocer que existen 6 grupos de alimentos con los cuales vamos a trabajar, y a partir
-          de ellos hablaremos de “raciones correspondientes”, esto se describe como la cantidad total por tiempo de
-          comida y durante todo el día de raciones a consumir de cada uno de los alimentos que puedan pertenecer
-          a los 6 grupos que muestro seguidamente.
-        </p>
-        <p>
-          La cantidad y la frecuencia del consumo de cada uno de los grupos va a estar directamente relacionada
-          con la planificación física y/o carga de entrenamiento o actividades que realices en tu día a día.
-        </p>
-        <p>
-          En la página siguiente conseguirás tu distribución diaria y por tiempo de comida de cada uno de los
-          grupos de alimentos adecuados a tus requerimientos de energía.
-        </p>
+
+      <div class="cover-title">PLAN DE ALIMENTACIÓN</div>
+
+      <div class="patient-info">
+        <div class="item">
+          <strong>Paciente</strong>
+          <div>{{ data.patient.name }}</div>
+        </div>
+        <div class="item">
+          <strong>Disciplina</strong>
+          <div>{{ data.patient.discipline or "____________________" }}</div>
+        </div>
+        <div class="item">
+          <strong>Objetivo</strong>
+          <div>____________________</div>
+        </div>
+        <div class="item">
+          <strong>Sexo</strong>
+          <div>{{ data.patient.sex }}</div>
+        </div>
+        <div class="item">
+          <strong>Edad</strong>
+          <div>{{ data.patient.age }}</div>
+        </div>
       </div>
-      <div class="footer">UCV-MPPS: 5489</div>
+
+      <div class="cover-text">
+        A continuación te presento tu plan de alimentación. Lo primero que debes
+        conocer es que el mismo está diseñado tomando en cuenta todos y cada uno
+        de los datos y resultados obtenidos en la consulta, por lo tanto es
+        <strong>PERSONAL E INDIVIDUAL</strong>, lo que indica que no le será
+        funcional a otra persona. Inicialmente debes conocer que existen 6
+        grupos de alimentos con los cuales vamos a trabajar, y a partir de ellos
+        hablaremos de “RACIONES CORRESPONDIENTES”, esto basicamente se describe
+        como la cantidad total por tiempo de comida y durante todo el día de
+        raciones a consumir de cada uno de los alimentos que puedas pertenecer a
+        los 6 grupos que muestro seguidamente:
+      </div>
+
+      <img
+        class="groups-img"
+        src="assets/plan/tipos_raciones.png"
+        alt="Grupos"
+      />
+
+      <div class="cover-text">
+        La cantidad y la frecuencia del consumo de cada uno de los grupos va
+        estar directamente relacionado con la planificación física y/o carga de
+        entrenamiento o actividades que realices en tu día a día. En la página
+        siguiente conseguirás tu distribuición diaria y por tiempo de comida de
+        cada uno de los grupos de alimentos adecuados a tus requerimientos de
+        energía.
+      </div>
+
+      <img
+        class="bottom-banner"
+        src="assets/plan/banner_inferior.png"
+        alt="Contacto"
+      />
     </section>
 
-    <section class="page distribution">
-      <h2>DISTRIBUCIÓN DE RACIONES</h2>
-      <div class="totals">
-        <div class="total">
-          <div class="label">VEGETALES</div>
-          <div class="value">{{ "%.2f"|format(data.totals["Vegetales"]) }}</div>
+    <section class="page">
+      <h2 class="section-title">DISTRIBUCIÓN DE RACIONES</h2>
+      <div class="two-columns">
+        <div class="column">
+          <div class="rations-list">
+            <h3>Raciones totales por día</h3>
+            <ul>
+              <li>
+                <span>Vegetales</span
+                ><strong>{{ data.totals['Vegetales']|round(0)|int }}</strong>
+              </li>
+              <li>
+                <span>Frutas</span
+                ><strong>{{ data.totals['Frutas']|round(0)|int }}</strong>
+              </li>
+              <li>
+                <span>Almidones</span
+                ><strong>{{ data.totals['Almidones']|round(0)|int }}</strong>
+              </li>
+              <li>
+                <span>Proteicos</span
+                ><strong>{{ data.totals['Proteínas']|round(0)|int }}</strong>
+              </li>
+              <li>
+                <span>Grasas</span
+                ><strong>{{ data.totals['Grasas']|round(0)|int }}</strong>
+              </li>
+              <li>
+                <span>Agua</span><strong>{{ data.agua_litros }} L</strong>
+              </li>
+            </ul>
+          </div>
         </div>
-        <div class="total">
-          <div class="label">FRUTAS</div>
-          <div class="value">{{ "%.2f"|format(data.totals["Frutas"]) }}</div>
-        </div>
-        <div class="total">
-          <div class="label">ALMIDONES</div>
-          <div class="value">{{ "%.2f"|format(data.totals["Almidones"]) }}</div>
-        </div>
-        <div class="total">
-          <div class="label">PROTEICOS</div>
-          <div class="value">{{ "%.2f"|format(data.totals["Proteínas"]) }}</div>
-        </div>
-        <div class="total">
-          <div class="label">GRASAS</div>
-          <div class="value">{{ "%.2f"|format(data.totals["Grasas"]) }}</div>
-        </div>
-        <div class="total">
-          <div class="label">AGUA</div>
-          <div class="value">{{ data.agua_litros }} litros/día</div>
+        <div class="column">
+          <div class="cover-text">
+            {{ data.patient.name }}, acá logras observar a tu izquierda el total
+            de raciones que te corresponden en el día, es decir, todo lo que
+            debes consumir en todo el día según los grupos de alimentos que te
+            han sido asignados. A continuación tendrás una distribución similar
+            pero por tiempos de comida, iniciando por la primera comida del día.
+            Recuerda que la misma puede ser distribuida como desees,
+            <strong>SIEMPRE Y CUANDO</strong> respetes el
+            <strong>TOTAL DIARIO</strong>.
+          </div>
         </div>
       </div>
+      <img
+        class="bottom-banner"
+        src="assets/plan/banner_inferior.png"
+        alt="Contacto"
+      />
+    </section>
 
-      <table class="distribution-table">
+    {% for meal in menu_pages %}
+    <section class="page">
+      <div class="menu-header">
+        <h2>{{ meal.title }} - Hora: {{ meal.time }}</h2>
+      </div>
+
+      <div class="ration-row">
+        {% for col in meal.columns %} {% set group_key = 'Proteínas' if col ==
+        'Proteínas' else col %}
+        <div class="ration-chip">
+          <span>{{ col }}</span>
+          <strong
+            >{{ data.distribution[group_key][meal.meal_key]|round(0)|int
+            }}</strong
+          >
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="menu-subtitle">
+        DEBES ESCOGER UNA (1) OPCIÓN POR COLUMNA Y MULTIPLICAR POR LA CANTIDAD
+        ASIGNADA DE RACIONES DE CADA GRUPO
+      </div>
+
+      <table class="menu-table">
         <thead>
           <tr>
-            <th>Grupo</th>
-            {% for meal in meals %}
-              <th>{{ meal }}</th>
+            {% for col in meal.columns %}
+            <th>{{ col }}</th>
             {% endfor %}
           </tr>
         </thead>
         <tbody>
-          {% for group in groups %}
-            <tr>
-              <td class="group">{{ group }}</td>
-              {% for meal in meals %}
-                <td>{{ "%.2f"|format(data.distribution[group][meal]) }}</td>
-              {% endfor %}
-            </tr>
+          {% set max_len = 0 %} {% for opt in meal.options %} {% if opt|length >
+          max_len %} {% set max_len = opt|length %} {% endif %} {% endfor %} {%
+          for i in range(max_len) %}
+          <tr>
+            {% for opt in meal.options %}
+            <td>{{ opt[i] if i < opt|length else '' }}</td>
+            {% endfor %}
+          </tr>
           {% endfor %}
         </tbody>
       </table>
 
-      <div class="note">
-        Recuerda que puedes distribuir las raciones como desees, siempre y cuando respetes el total diario.
+      <div class="menu-note">{{ meal.example }}</div>
+      {% if meal.note %}
+      <div class="menu-note">{{ meal.note }}</div>
+      {% endif %}
+
+      <img
+        class="bottom-banner"
+        src="assets/plan/banner_inferior.png"
+        alt="Contacto"
+      />
+    </section>
+    {% endfor %}
+
+    <section class="page">
+      <h2 class="section-title">RACIONES DE FRUTAS</h2>
+      <div class="cover-text">
+        Una (1) ración de frutas equivale a: 1 unidad pequeña o mediana, 1 taza
+        de fruta fresca (sola o combinada con otras frutas), 1/2 taza de fruta
+        seca (deshidratada), con excepciones (mostradas con color).
       </div>
+      <img
+        class="fruit-image"
+        src="assets/plan/raciones_frutas.png"
+        alt="Raciones de frutas"
+      />
+      <img
+        class="bottom-banner"
+        src="assets/plan/banner_inferior.png"
+        alt="Contacto"
+      />
     </section>
 
-    <section class="page meal">
-      <h2>PRE-DESAYUNO</h2>
-      <div class="slide-text">
-LÁCTEOS
-VEGETALES
-FRUTAS
-ALMIDONES
-PROTEÍNAS
-GRASAS
-LÁCTEOS
-FRUTAS
-ALMIDONES
-PROTEÍNAS
-GRASAS
-1 taza de leche
-(ml/gramos):
-240
-1 ración de frutas entera/jugo
-1 arepa pequeña (ml/gramos): 50 (80 cruda)
-Pesar crudo 25-30 g por encima
-1 reb/lonja de queso (ml/gramos): 30
-1 lonja/s de aguacate (ml/gramos): 30
-1 reb de pan cuadrado integral/blanco (ml/gramos): 30
-1 reb/lonja de pechuga de pavo (ml/gramos): 30
-1 lonja/s tocineta (ml/gramos): 10
-3/4 taza de yogurt firme (ml/gramos): 150
-1/4 plátano (horneado, sacochado/airfryer) (ml/gramos): 50
-1 huevo entero (clara + amarilla)
-1 cucharadita/s de aceite (oliva, aguacate, coco o similar) (ml/gramos): 5
-1 fajita/tortilla de trigo/maíz/yuca o similar (tipo bimbo o crustissimo)
-1 trozo/2 cdas de carne pollo o pescado (ml/gramos): 30
-2 1/2 cdas de leche en polvo (ml/gramos): 35
-1 trozo de batata-apio-yuca-ocumo o similar (ml/gramos): 80
-2 cdta/s de mantequilla de maní, almendras o similar (ml/gramos): 10
-1 papa mediana (ml/gramos): 100
-Atún o sardina (ml/gramos): 35
-1 unidad de yogurt tipo griego (yolo-yogpro-boom)
-1 trozo o 5 rueditas de casabe (ml/gramos): 25
-1 cda/s de semillas de ajonjolí o chía
-1/4 taza de avena o crema de arroz o similar (ml/gramos): 20
-1 scoop de proteína (ml/gramos): 30-35 NO MULTIPLICAR
-Aceitunas (ml/gramos): 30
-1/2 taza de cereal (tipo corn flakes o similar) (ml/gramos): 25
-1 cucharadita/s de mantequilla (ml/gramos): 5
-1 unidad de cachapa peq. (ml/gramos): 50
-CUALQUIER OTRA OPCIÓN DEBES CONSULTAR
-DEBES ESCOGER UNA (1) OPCIÓN POR COLUMNA Y MULTIPLICAR POR LA CANTIDAD ASIGNADA DE RACIONES DE CADA GRUPO
-EJEMPLO: 2 rebanadas de pan blanco + 60 g de jamón + 1 cambur
-SI NO ENTRENAS OMITE LA FRUTA Y LOS ALMIDONES Y PASAS LAS 2 PROTEÍNAS PARA OTRA COMIDA
+    <section class="page">
+      <h2 class="section-title">MENÚ EJEMPLO</h2>
+      <div class="menu-example">
+        <h3>Desayuno</h3>
+        <p>
+          60 g de pan de masa madre, 3 huevos enteros en tortilla + 2 lonjas de
+          jamón (60 g), 1 manzana, 1 lonja de aguacate (30 g).
+        </p>
+        <h3>Merienda mañana</h3>
+        <p>
+          1 scoop de proteína con agua o leche vegetal, ¼ taza (20 g) de
+          granola, 1 cambur.
+        </p>
+        <h3>Almuerzo</h3>
+        <p>
+          1 bistec grande (180 g cocido - 210 g crudo), 160 g de batata
+          horneada, 2 tazas de ensalada cruda.
+        </p>
+        <h3>Merienda tarde</h3>
+        <p>
+          1 scoop de proteína con agua o leche vegetal, ¼ taza (20 g) de
+          granola, 1 cambur.
+        </p>
+        <h3>Cena</h3>
+        <p>
+          1 milanesa de pollo grande (180 g cocida – 210 cruda), 3 fajitas tipo
+          bimbo o similares, 1 taza de vegetales cocidos. Mezclar con el pollo.
+          2 cdtas (10 cc) de aceite de oliva (agregar a los vegetales).
+        </p>
+        <p>
+          <strong
+            >TODO LO QUE SE LLEVE A COCCIÓN EN AIRFRYER DEBE PESARSE
+            CRUDO</strong
+          >
+        </p>
       </div>
+      <img
+        class="bottom-banner"
+        src="assets/plan/banner_inferior.png"
+        alt="Contacto"
+      />
     </section>
 
-    <section class="page meal">
-      <h2>DESAYUNO</h2>
-      <div class="slide-text">
-LÁCTEOS
-VEGETALES
-FRUTAS
-ALMIDONES
-PROTEÍNAS
-GRASAS
-LÁCTEOS
-FRUTAS
-ALMIDONES
-PROTEÍNAS
-GRASAS
-1 taza de leche (ml/gramos): 240
-1 ración de frutas entera/jugo
-1 arepa pequeña (ml/gramos): 50
-Pesar crudo 25-30 g por encima
-1 reb/lonja de queso (ml/gramos): 30
-1 lonja/s de aguacate (ml/gramos): 30
-1 reb de pan cuadrado integral/blanco (ml/gramos): 30
-1 reb/lonja de pechuga de pavo (ml/gramos): 30
-1 lonja/s tocineta (ml/gramos): 10
-3/4 taza de yogurt firme (ml/gramos): 150
-1/4 plátano (horneado, sacochado/airfryer) (ml/gramos): 50
-1 huevo entero (clara + amarilla)
-1 cucharadita/s de aceite (oliva, aguacate, coco o similar) (ml/gramos): 5
-1 fajita/tortilla de trigo/maíz/yuca o similar (tipo bimbo o crustissimo)
-1 trozo/2 cdas de carne pollo o pescado (ml/gramos): 30
-2 1/2 cdas de leche en polvo (ml/gramos): 35
-1 trozo de batata-apio-yuca-ocumo o similar (ml/gramos): 80
-2 cdta/s de mantequilla de maní, almendras o similar (ml/gramos): 10
-1 papa mediana (ml/gramos): 100
-Atún o sardina (ml/gramos): 35
-1 unidad de yogurt tipo griego (yolo-yogpro-boom)
-1 trozo o 5 rueditas de casabe (ml/gramos): 25
-1 scoop de proteína (ml/gramos): 30-35 NO MULTIPLICAR
-1 cda/s de semillas de ajonjolí o chía
-1/4 taza de avena o crema de arroz o similar (ml/gramos): 20
-Aceitunas (ml/gramos): 30
-1/2 taza de cereal (tipo corn flakes o similar) (ml/gramos): 25
-1 cucharadita/s de mantequilla (ml/gramos): 5
-1 unidad de cachapa peq. (ml/gramos): 50
-CUALQUIER OTRA OPCIÓN DEBES CONSULTAR
-DEBES ESCOGER UNA (1) OPCIÓN POR COLUMNA Y MULTIPLICAR POR LA CANTIDAD ASIGNADA DE RACIONES DE CADA GRUPO
-EJEMPLO: 3 huevos revueltos + 3 rebanadas de pan + 1 lonja de aguacate + 1 manzana
-Para alcanzar 180 g de pollo debes pesar 210-220 g crudos
+    <section class="page">
+      <h2 class="section-title">LISTA DE RACIONES DE FRUTAS</h2>
+      <div class="cover-text">
+        Una (1) ración de frutas equivale a: 1 unidad pequeña o mediana, 1 taza
+        de fruta fresca (sola o combinada con otras frutas), 1/2 taza de fruta
+        seca (deshidratada). Con excepciones (mostradas con color).
       </div>
+      <table class="fruit-table">
+        <thead>
+          <tr>
+            <th>Fruta</th>
+            <th>Porción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Toronja</td>
+            <td>180 g</td>
+          </tr>
+          <tr>
+            <td>Manzana</td>
+            <td>120 g</td>
+          </tr>
+          <tr>
+            <td>Pera</td>
+            <td>120 g</td>
+          </tr>
+          <tr>
+            <td>1/2 cambur grande o 1 unidad pequeña</td>
+            <td>90 g</td>
+          </tr>
+          <tr>
+            <td>Kiwi</td>
+            <td>100 g</td>
+          </tr>
+          <tr>
+            <td>Mamey</td>
+            <td>170 g</td>
+          </tr>
+          <tr>
+            <td>Mango</td>
+            <td>90 g</td>
+          </tr>
+          <tr>
+            <td>Naranja</td>
+            <td>190 g</td>
+          </tr>
+          <tr>
+            <td>Nectarina</td>
+            <td>120 g</td>
+          </tr>
+          <tr>
+            <td>Níspero</td>
+            <td>90 g</td>
+          </tr>
+          <tr>
+            <td>Riñón</td>
+            <td>80 g</td>
+          </tr>
+          <tr>
+            <td>Albaricoque</td>
+            <td>110 g</td>
+          </tr>
+          <tr>
+            <td>Guayaba</td>
+            <td>200 g</td>
+          </tr>
+          <tr>
+            <td>Jobo</td>
+            <td>100 g</td>
+          </tr>
+          <tr>
+            <td>Mandarina</td>
+            <td>130 g</td>
+          </tr>
+          <tr>
+            <td>Melocotón</td>
+            <td>80 g</td>
+          </tr>
+          <tr>
+            <td>Tuna</td>
+            <td>80 g</td>
+          </tr>
+          <tr>
+            <td>Ciruelas</td>
+            <td>150 g</td>
+          </tr>
+          <tr>
+            <td>
+              Durazno <span class="fruit-note">(2 unidades pequeñas)</span>
+            </td>
+            <td>120 g</td>
+          </tr>
+          <tr>
+            <td>
+              Parchita o maracuyá
+              <span class="fruit-note">(2 unidades pequeñas)</span>
+            </td>
+            <td>140 g</td>
+          </tr>
+          <tr>
+            <td>
+              Ciruela de hueso <span class="fruit-note">(8 unidades)</span>
+            </td>
+            <td>80 g</td>
+          </tr>
+          <tr>
+            <td>
+              Cerezas (semeruco) <span class="fruit-note">(12 unidades)</span>
+            </td>
+            <td>160 g</td>
+          </tr>
+          <tr>
+            <td>
+              Uvas <span class="fruit-note">(15 pequeñas o 6 grandes)</span>
+            </td>
+            <td>90 g</td>
+          </tr>
+          <tr>
+            <td>
+              Guanábana (pulpa) <span class="fruit-note">(1/2 taza)</span>
+            </td>
+            <td>100 g</td>
+          </tr>
+          <tr>
+            <td>Piña <span class="fruit-note">(3/4 taza)</span></td>
+            <td>100 g</td>
+          </tr>
+          <tr>
+            <td>Fresas <span class="fruit-note">(1 taza)</span></td>
+            <td>180 g</td>
+          </tr>
+          <tr>
+            <td>Mamón <span class="fruit-note">(1 taza)</span></td>
+            <td>90 g</td>
+          </tr>
+          <tr>
+            <td>Mora <span class="fruit-note">(1 taza)</span></td>
+            <td>120 g</td>
+          </tr>
+          <tr>
+            <td>
+              Melón <span class="fruit-note">(2 tazas o un trozo grande)</span>
+            </td>
+            <td>300 g</td>
+          </tr>
+          <tr>
+            <td>
+              Lechosa
+              <span class="fruit-note">(2 tazas o un trozo grande)</span>
+            </td>
+            <td>200 g</td>
+          </tr>
+          <tr>
+            <td>
+              Patilla o sandía
+              <span class="fruit-note">(2 tazas o un trozo grande)</span>
+            </td>
+            <td>300 g</td>
+          </tr>
+          <tr>
+            <td>Pasitas <span class="fruit-note">(2 cucharaditas)</span></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>Dátiles <span class="fruit-note">(3 unidades)</span></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>Ciruelas pasas <span class="fruit-note">(3 unidades)</span></td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+      <img
+        class="bottom-banner"
+        src="assets/plan/banner_inferior.png"
+        alt="Contacto"
+      />
     </section>
 
-    <section class="page meal">
-      <h2>MERIENDA (MAÑANA)</h2>
-      <div class="slide-text">
-LÁCTEOS
-VEGETALES
-FRUTAS
-ALMIDONES
-PROTEÍNAS
-GRASAS
-LÁCTEOS
-FRUTAS
-ALMIDONES
-PROTEÍNAS
-GRASAS
-1 taza de leche (ml/gramos): 240
-1 ración de frutas entera/jugo
-Consumir como se subraya
-2 torticas de arroz inflado
-1 reb/lonja de queso (ml/gramos): 30
-1/2 puño de frutos secos (ml/gramos): 10
-1 reb de pan cuadrado integral/blanco (ml/gramos): 30
-1 reb/lonja de pechuga de pavo (ml/gramos): 30
-6 almendras/merey
-3/4 taza de yogurt firme (ml/gramos): 150
-1/4 plátano (horneado, sacochado/airfryer) (ml/gramos): 50
-1 huevo entero (clara + amarilla)
-1 cucharadita/s de aceite (oliva, aguacate, coco o similar) (ml/gramos): 5
-1 fajita/tortilla de trigo/maíz/yuca o similar (tipo bimbo o crustissimo)
-1 trozo/2 cdas de carne pollo o pescado (ml/gramos): 30
-2 1/2 cdas de leche en polvo (ml/gramos): 35
-1 barrita/s de cereal (Avelina o Natural Valley)
-2 cdta/s de mantequilla de maní, almendras o similar (ml/gramos): 10
-1 paquete/s de galleta tipo soda o similar
-Atún o sardina (ml/gramos): 35
-1 unidad de yogurt tipo griego (yolo-yogpro-boom)
-1 trozo o 5 rueditas de casabe (ml/gramos): 25
-1 scoop de proteína (ml/gramos): 30-35 NO MULTIPLICAR
-1 cda/s de semillas de ajonjolí o chía
-1/4 taza de avena o crema de arroz o similar (ml/gramos): 20
-2 cdas de coco rallado
-1/2 taza de cereal (tipo corn flakes o similar) (ml/gramos): 25
-6 unidades de pistacho/semillas de calabaza
-1/4 taza de granola (20 g)
-CUALQUIER OTRA OPCIÓN DEBES CONSULTAR
-DEBES ESCOGER UNA (1) OPCIÓN POR COLUMNA Y MULTIPLICAR POR LA CANTIDAD ASIGNADA DE RACIONES DE CADA GRUPO
-EJEMPLO: 3 huevos revueltos + 3 rebanadas de pan + 1 lonja de aguacate + 1 manzana
+    <section class="page">
+      <h2 class="section-title">MENÚ EJEMPLO</h2>
+      <div class="menu-example">
+        <h3>Desayuno</h3>
+        <p>60 g de pan de masa madre</p>
+        <p>3 huevos enteros en tortilla + 2 lonjas de jamón (60 g)</p>
+        <p>1 manzana</p>
+        <p>1 lonja de aguacate (30 g)</p>
+        <h3>Merienda mañana</h3>
+        <p>1 scoop de proteína con agua o leche vegetal</p>
+        <p>¼ taza (20 g) de granola</p>
+        <p>1 cambur</p>
+        <h3>Almuerzo</h3>
+        <p>1 bistec grande (180 g cocido-210 crudo)</p>
+        <p>160 g de batata horneada</p>
+        <p>2 tazas de ensalada cruda</p>
+        <h3>Merienda tarde</h3>
+        <p>1 scoop de proteína con agua o leche vegetal</p>
+        <p>¼ taza (20 g) de granola</p>
+        <p>1 cambur</p>
+        <h3>Cena</h3>
+        <p>1 milanesa de pollo grande (180 g cocida – 210 cruda)</p>
+        <p>3 fajitas tipo bimbo o similares</p>
+        <p>1 taza de vegetales cocidos. Mezclar con el pollo</p>
+        <p>2 cdtas (10 cc) de aceite de oliva (agregar a los vegetales)</p>
+        <p>
+          <strong
+            >TODO LO QUE SE LLEVE A COCCIÓN EN AIRFRYER DEBE PESARSE
+            CRUDO</strong
+          >
+        </p>
       </div>
-    </section>
-
-    <section class="page meal">
-      <h2>ALMUERZO</h2>
-      <div class="slide-text">
-LÁCTEOS
-VEGETALES
-FRUTAS
-ALMIDONES
-PROTEÍNAS
-GRASAS
-VEGETALES
-FRUTAS
-ALMIDONES
-PROTEÍNAS
-GRASAS
-Taza de vegetales crudos (pepino, repollo, lechuga, celery, tomate, zanahoria, cebolla, palmito)
-Lo ideal es elaborar una ensalada con la mezcla de ellos.
-1 ración de frutas entera/jugo
-Consumir como se subraya
-1/2 taza de arroz (ml/gramos): 80
-1 trozo/2 cdas de carne pollo, pescado/lomo de cerdo (ml/gramos): 30
-1 lonja/s de aguacate (ml/gramos): 30
-1/2 taza de pasta (ml/gramos): 70
-1 lonja/s tocineta (ml/gramos): 10
-1/4 plátano (horneado, sacochado/airfryer) (ml/gramos): 50
-1 huevo entero (clara + amarilla)
-1 cucharadita/s de aceite (oliva, aguacate, coco o similar) (ml/gramos): 5
-1 fajita/tortilla de trigo/maíz/yuca o similar (tipo bimbo o crustissimo)
-1 reb/lonja de pechuga de pavo (ml/gramos): 30
-1 trozo de batata-apio-yuca-ocumo o similar (ml/gramos): 80
-Atún o sardina (ml/gramos): 35
-2 cdta/s de mantequilla de maní, almendras o similar (ml/gramos): 10
-1 papa mediana (ml/gramos): 100
-Taza de vegetales cocidos o en crema (auyama, cebolla, zanahoria, remolacha, vainitas, berenjena, calabacín, espinacas, coliflor, brócoli, acelga)
-1 trozo o 5 rueditas de casabe (ml/gramos): 25
-1 scoop de proteína (ml/gramos): 30-35 NO MULTIPLICAR
-1 cda/s de semillas de ajonjolí o chía
-1 taza de puré de papa, apio, ñame u ocumo (ml/gramos): 80-100
-1 reb/lonja de queso (ml/gramos): 30
-Aceitunas (ml/gramos): 30
-1/4 taza de quínoa (ml/gramos): 40
-Mariscos o frutos del mar (ml/gramos): 30
-1 cucharadita/s de mantequilla (ml/gramos): 5
-1 unidad de cachapa peq. (ml/gramos): 50
-CUALQUIER OTRA OPCIÓN DEBES CONSULTAR
-1/2 taza de leguminosas (caraotas, lentejas o similar) siempre y cuando las toleres
-DEBES ESCOGER UNA (1) OPCIÓN POR COLUMNA Y MULTIPLICAR POR LA CANTIDAD ASIGNADA DE RACIONES DE CADA GRUPO
-EJEMPLO: 3 huevos revueltos + 3 rebanadas de pan + 1 lonja de aguacate + 1 manzana
-Para alcanzar 180 g de proteína debes pesar 230 g crudos
-      </div>
-    </section>
-
-    <section class="page meal">
-      <h2>MERIENDA (TARDE)</h2>
-      <div class="slide-text">
-LÁCTEOS
-VEGETALES
-FRUTAS
-ALMIDONES
-PROTEÍNAS
-GRASAS
-DEBES ESCOGER UNA (1) OPCIÓN POR COLUMNA Y MULTIPLICAR POR LA CANTIDAD ASIGNADA DE RACIONES DE CADA GRUPO
-EN SUSTITUCIÓN DE LAS RACIONES DE PROTEÍNA PUEDES INCLUIR YOGURT O BARRITAS
-LÁCTEOS
-FRUTAS
-ALMIDONES
-PROTEÍNAS
-GRASAS
-1 taza de leche (ml/gramos): 240
-1 ración de frutas entera/jugo
-Consumir como se subraya
-2 torticas de arroz inflado
-1 reb/lonja de queso (ml/gramos): 30
-1 lonja/s de aguacate (ml/gramos): 30
-1 reb de pan cuadrado integral/blanco (ml/gramos): 30
-1 reb/lonja de pechuga de pavo (ml/gramos): 30
-1 lonja/s tocineta (ml/gramos): 10
-3/4 taza de yogurt firme (ml/gramos): 150
-1/4 plátano (horneado, sacochado/airfryer) (ml/gramos): 50
-1 huevo entero (clara + amarilla)
-1 cucharadita/s de aceite (oliva, aguacate, coco o similar) (ml/gramos): 5
-1 fajita/tortilla de trigo/maíz/yuca o similar (tipo bimbo o crustissimo)
-1 trozo/2 cdas de carne pollo o pescado (ml/gramos): 30
-2 1/2 cdas de leche en polvo (ml/gramos): 35
-1 barrita/s de cereal (Avelina o Natural Valley)
-2 cdta/s de mantequilla de maní, almendras o similar (ml/gramos): 10
-1 paquete/s de galleta tipo soda o similar
-Atún o sardina (ml/gramos): 35
-1 unidad de yogurt tipo griego (yolo-yogpro-boom)
-1 trozo o 5 rueditas de casabe (ml/gramos): 25
-1 scoop de proteína (ml/gramos): 30-35 NO MULTIPLICAR
-1 cda/s de semillas de ajonjolí o chía
-1/4 taza de avena o crema de arroz o similar (ml/gramos): 20
-Aceitunas (ml/gramos): 30
-1/2 taza de cereal (tipo corn flakes o similar) (ml/gramos): 25
-1 cucharadita/s de mantequilla (ml/gramos): 5
-1/4 taza de granola (20 g)
-CUALQUIER OTRA OPCIÓN DEBES CONSULTAR
-EJEMPLO: 3 huevos revueltos + 3 rebanadas de pan + 1 lonja de aguacate + 1 manzana
-      </div>
-    </section>
-
-    <section class="page meal">
-      <h2>CENA</h2>
-      <div class="slide-text">
-LÁCTEOS
-VEGETALES
-FRUTAS
-ALMIDONES
-PROTEÍNAS
-GRASAS
-VEGETALES
-FRUTAS
-ALMIDONES
-PROTEÍNAS
-GRASAS
-Taza de vegetales crudos (pepino, repollo, lechuga, celery, tomate, zanahoria, cebolla, palmito)
-Lo ideal es elaborar una ensalada con la mezcla de ellos.
-1 ración de frutas entera/jugo
-Consumir como se subraya
-1/2 taza de arroz (ml/gramos): 80
-1 trozo/2 cdas de carne pollo, pescado/lomo de cerdo (ml/gramos): 30
-1 lonja/s de aguacate (ml/gramos): 30
-1/2 taza de pasta (ml/gramos): 70
-1 lonja/s tocineta (ml/gramos): 10
-1/4 plátano (horneado, sacochado/airfryer) (ml/gramos): 50
-1 huevo entero (clara + amarilla)
-1 cucharadita/s de aceite (oliva, aguacate, coco o similar) (ml/gramos): 5
-1 fajita/tortilla de trigo/maíz/yuca o similar (tipo bimbo o crustissimo)
-1 reb/lonja de pechuga de pavo (ml/gramos): 30
-1 trozo de batata-apio-yuca-ocumo o similar (ml/gramos): 80
-Atún o sardina (ml/gramos): 35
-2 cdta/s de mantequilla de maní, almendras o similar (ml/gramos): 10
-1 papa mediana (ml/gramos): 100
-Taza de vegetales cocidos o en crema (auyama, cebolla, zanahoria, remolacha, vainitas, berenjena, calabacín, espinacas, coliflor, brócoli, acelga)
-1 trozo o 5 rueditas de casabe (ml/gramos): 25
-1 scoop de proteína (ml/gramos): 30-35
-1 cda/s de semillas de ajonjolí o chía
-1 taza de puré de papa, apio, ñame u ocumo (ml/gramos): 80-100
-1 reb/lonja de queso (ml/gramos): 30
-Aceitunas (ml/gramos): 30
-1/4 taza de quínoa (ml/gramos): 40
-Mariscos o frutos del mar (ml/gramos): 30
-1 cucharadita/s de mantequilla (ml/gramos): 5
-1 arepa pequeña (ml/gramos): 50
-1 reb de pan cuadrado integral/blanco (ml/gramos): 30
-CUALQUIER OTRA OPCIÓN DEBES CONSULTAR
-DEBES ESCOGER UNA (1) OPCIÓN POR COLUMNA Y MULTIPLICAR POR LA CANTIDAD ASIGNADA DE RACIONES DE CADA GRUPO
-EJEMPLO: 3 huevos revueltos + 3 rebanadas de pan + 1 lonja de aguacate + 1 manzana
-SI NO ENTRENAS OMITE
-      </div>
-    </section>
-
-    <section class="page static">
-      <h2>LISTA DE RACIONES DE FRUTA</h2>
-      <p>Contenido estático a replicar desde la plantilla base.</p>
-    </section>
-
-    <section class="page static">
-      <h2>MENÚ EJEMPLO</h2>
-      <p>
-        CENA: 1 milanesa de pollo grande (180 g cocida – 210 cruda), 3 fajitas tipo bimbo o similares, 1 taza de
-        vegetales cocidos (mezclar con el pollo), 2 cdtas (10 cc) de aceite de oliva (agregar a los vegetales).
-      </p>
-      <p>
-        ALMUERZO: 1 scoop de proteína con agua o leche vegetal, 1/4 taza (20 g) de granola, 1 cambur, 1 bistec grande
-        (180 g cocido – 210 crudo), 160 g de batata horneada, 2 tazas de ensalada cruda.
-      </p>
-      <p>
-        MERIENDA TARDE: 60 g de pan de masa madre, 3 huevos enteros en tortilla + 2 lonjas de jamón (60 g),
-        1 manzana, 1 lonja de aguacate (30 g).
-      </p>
-      <p>
-        DESAYUNO: 1 scoop de proteína con agua o leche vegetal, 1/4 taza (20 g) de granola, 1 cambur.
-      </p>
-      <p>Todo lo que se lleve a cocción en airfryer debe pesarse crudo.</p>
-    </section>
-
-    <section class="page static">
-      <h2>INDICACIONES GENERALES</h2>
-      <p>Contenido estático: indicaciones generales (1).</p>
-    </section>
-
-    <section class="page static">
-      <h2>INDICACIONES GENERALES</h2>
-      <p>Contenido estático: indicaciones generales (2).</p>
-    </section>
-
-    <section class="page static">
-      <h2>INDICACIONES INDIVIDUALES</h2>
-      <p>
-        Los horarios están condicionados por la hora de entrenamiento. Tratar en la medida de lo posible de que
-        independientemente de la hora de entrenamiento debe existir una comida post alta en proteínas (como puede
-        ser cualquiera de las principales) o una merienda similar a la de la tarde.
-      </p>
-      <p>
-        Mantener buenos niveles de hidratación, el requerimiento hídrico mínimo es de 2,5 litros/día, lo que se
-        traduce en aproximadamente 10 1/2 vasos de agua/líquido al día. La sensación de sed indica cierto grado de
-        deshidratación. ¡No esperes a sentirla!
-      </p>
-      <p>
-        Evitar el agregado de azúcar a cualquier bebida o preparación. Ve progresivamente desincorporando al azúcar.
-        Evitar el consumo de alcohol en cantidades superiores a 2/3 tragos día y con una frecuencia mayor a 1 vez/semana.
-      </p>
-      <p>
-        Evita el consumo frecuente del gluten, lactosa o productos muy condimentados o picantes. Evita el consumo
-        frecuente de alimentos ultra-procesados.
-      </p>
-    </section>
-
-    <section class="page static">
-      <h2>INDICACIONES INDIVIDUALES</h2>
-      <p>Pendiente de la hidratación. No esperes a sentir sed. Vigila el color de tu orina.</p>
-    </section>
-
-    <section class="page static">
-      <h2>SUPLEMENTOS</h2>
-      <p>
-        Vitamina D: 2000 o 2500 UI/día (1 o 2 cápsulas según presentación), junto al desayuno.
-      </p>
-      <p>
-        Omega 3: una cápsula al día junto al almuerzo. Los días que consumas pescado puedes omitir la suplementación.
-      </p>
-      <p>
-        Citrato de magnesio: 1 cápsula (400 mg) todas las noches antes de dormir.
-      </p>
-      <p>
-        Creatina monohidrato: 5 g/día (1 scoop), todos los días después de entrenar junto con una comida principal.
-      </p>
-      <p>
-        Suplementos como L-carnitina, BCAA o quemadores de grasa no tienen un efecto positivo en la composición corporal.
-      </p>
-    </section>
-
-    <section class="page static">
-      <h2>¿DÓNDE ADQUIRIRLOS?</h2>
-      <p>Contenido estático a replicar desde la plantilla base.</p>
-    </section>
-
-    <section class="page static">
-      <h2>ORIENTACIÓN BÁSICA PARA ORGANIZAR TUS RUTINAS</h2>
-      <p>https://www.youtube.com/watch?v=cuRc7uYdWbM</p>
-      <p>https://www.youtube.com/watch?v=wFWL3ZXvPP4</p>
+      <img
+        class="bottom-banner"
+        src="assets/plan/banner_inferior.png"
+        alt="Contacto"
+      />
     </section>
   </body>
 </html>

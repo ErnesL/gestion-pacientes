@@ -142,9 +142,6 @@ def load_patient_info(wb) -> PatientInfo:
         missing.append("Sexo (HISTORIA!C10)")
     if not age_str:
         missing.append("Edad (HISTORIA!C7)")
-    if not discipline:
-        missing.append("Disciplina/Actividad (HISTORIA!I8)")
-
     if missing:
         raise ValidationError("Faltan campos: " + "; ".join(missing))
 
