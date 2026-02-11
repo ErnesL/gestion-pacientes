@@ -17,8 +17,20 @@ pip install -r requirements.txt
 
 ```bash
 python src/generate_pptx.py "ruta/al/archivo.xlsx" \
-  --template "Source material/Plan de Alimentación Base.pptx" \
+  --template "src-material/Plan de Alimentación Base.pptx" \
   --output "output/Plan Alimentacion.pptx"
+```
+
+Alternativa rápida:
+
+```bash
+./scripts/run_pptx.sh
+```
+
+En Windows:
+
+```bat
+scripts\\run_pptx.bat
 ```
 
 El PPTX se guarda en `output/`.
