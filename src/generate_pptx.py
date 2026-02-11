@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -132,20 +133,27 @@ def to_int(value) -> int:
     return 0
 
 
-def build_meal_replacements(ws, meal_def) -> Tuple[Dict[str, str], Dict[str, int], bool, List[str]]:
+def build_meal_replacements(
+    ws, meal_def
+) -> Tuple[Dict[str, str], Dict[str, int], bool, List[str], Dict[str, int]]:
     values = {}
     for code, row in GROUP_ROWS.items():
         values[code] = to_int(ws[f"{meal_def['col']}{row}"].value)
 
     replacements = {}
     for code, suffix in GROUP_SUFFIX.items():
-        replacements[f"{{{{{meal_def['name']}_{suffix}}}}}"] = str(
+        placeholder = f"{{{{{meal_def['name']}_{suffix}}}}}"
+        replacements[placeholder] = "" if values[code] == 0 else str(
             values[code])
 
     include = any(values[code] > 0 for code in meal_def["groups"])
     tokens = [
         f"{{{{{meal_def['name']}_{GROUP_SUFFIX[code]}}}}}" for code in meal_def["groups"]]
-    return replacements, values, include, tokens
+    placeholder_values = {
+        f"{{{{{meal_def['name']}_{suffix}}}}}": values[code]
+        for code, suffix in GROUP_SUFFIX.items()
+    }
+    return replacements, values, include, tokens, placeholder_values
 
 
 def format_short_name(full_name: str) -> str:
@@ -183,19 +191,86 @@ def replace_in_text_frame(text_frame, replacements: Dict[str, str]) -> None:
                 paragraph.text = new_para_text
 
 
-def replace_in_shape(shape, replacements: Dict[str, str]) -> None:
+COL_MARKER_RE = re.compile(r"{{COL[:_](?P<key>[A-Z_]+)}}")
+SHAPE_COL_MARKER_RE = re.compile(r"COL_(?P<key>[A-Z_]+)")
+SHAPE_KEY_SUFFIXES = ("_ARROW", "_FLECHA", "_ICON")
+
+
+def normalize_shape_key(key: str) -> str:
+    for suffix in SHAPE_KEY_SUFFIXES:
+        if key.endswith(suffix):
+            return key[: -len(suffix)]
+    return key
+
+
+def should_hide_shape(shape, placeholder_values: Dict[str, int]) -> bool:
+    name = getattr(shape, "name", "") or ""
+    for key in SHAPE_COL_MARKER_RE.findall(name):
+        normalized = normalize_shape_key(key)
+        placeholder = f"{{{{{normalized}}}}}"
+        if placeholder_values.get(placeholder, 0) == 0:
+            return True
+    return False
+
+
+def remove_shape(shape) -> None:
+    element = shape._element
+    parent = element.getparent()
+    if parent is not None:
+        parent.remove(element)
+
+
+def replace_in_shape(
+    shape,
+    replacements: Dict[str, str],
+    placeholder_values: Dict[str, int],
+    slide_width: int,
+    slide_shapes,
+) -> None:
+    if should_hide_shape(shape, placeholder_values):
+        remove_shape(shape)
+        return
+
     if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
         for subshape in shape.shapes:
-            replace_in_shape(subshape, replacements)
+            replace_in_shape(
+                subshape, replacements, placeholder_values, slide_width, slide_shapes
+            )
+        return
+
+    if shape.has_table:
+        table = shape.table
+        cols_to_hide = set()
+        for col_idx in range(len(table.columns)):
+            for row in table.rows:
+                cell_text = row.cells[col_idx].text
+                markers = COL_MARKER_RE.findall(cell_text)
+                if markers:
+                    for key in markers:
+                        placeholder = f"{{{{{key}}}}}"
+                        if placeholder_values.get(placeholder, 0) == 0:
+                            cols_to_hide.add(col_idx)
+                    cleaned = COL_MARKER_RE.sub("", cell_text).strip()
+                    if cleaned != cell_text:
+                        row.cells[col_idx].text = cleaned
+                for placeholder, value in placeholder_values.items():
+                    if value == 0 and placeholder in cell_text:
+                        cols_to_hide.add(col_idx)
+
+        if cols_to_hide:
+            remove_table_columns(table, sorted(cols_to_hide, reverse=True))
+            if slide_width and shape._parent is slide_shapes:
+                table_width = sum(col.width for col in table.columns)
+                shape.width = table_width
+                shape.left = int((slide_width - shape.width) / 2)
+
+        for row in table.rows:
+            for cell in row.cells:
+                replace_in_text_frame(cell.text_frame, replacements)
         return
 
     if shape.has_text_frame:
         replace_in_text_frame(shape.text_frame, replacements)
-
-    if shape.has_table:
-        for row in shape.table.rows:
-            for cell in row.cells:
-                replace_in_text_frame(cell.text_frame, replacements)
 
 
 def text_frame_contains(text_frame, tokens: List[str]) -> bool:
@@ -216,6 +291,24 @@ def shape_contains_tokens(shape, tokens: List[str]) -> bool:
                 if text_frame_contains(cell.text_frame, tokens):
                     return True
     return False
+
+
+def remove_table_columns(table, col_indices: List[int]) -> None:
+    tbl = table._tbl
+    grid = tbl.tblGrid
+    for col_idx in col_indices:
+        grid_cols = getattr(grid, "gridCol_lst", None)
+        if grid_cols is None:
+            grid_cols = list(grid.iterchildren())
+        if col_idx < 0 or col_idx >= len(grid_cols):
+            continue
+        grid.remove(grid_cols[col_idx])
+        for row in table.rows:
+            cells = getattr(row._tr, "tc_lst", None)
+            if cells is None:
+                cells = list(row._tr.iterchildren())
+            if col_idx < len(cells):
+                row._tr.remove(cells[col_idx])
 
 
 def slide_contains_tokens(slide, tokens: List[str]) -> bool:
@@ -258,11 +351,14 @@ def main() -> int:
     presentation = Presentation(str(template_path))
     slides_to_remove: List[int] = []
     meal_tokens_to_remove: List[List[str]] = []
+    placeholder_values: Dict[str, int] = {}
 
     for meal_def in MEAL_DEFS:
-        meal_repl, _, include_meal, tokens = build_meal_replacements(
-            ws_req, meal_def)
+        meal_repl, _, include_meal, tokens, meal_placeholder_values = build_meal_replacements(
+            ws_req, meal_def
+        )
         replacements.update(meal_repl)
+        placeholder_values.update(meal_placeholder_values)
         if not include_meal:
             meal_tokens_to_remove.append(tokens)
 
@@ -274,7 +370,13 @@ def main() -> int:
         if idx in slides_to_remove:
             continue
         for shape in slide.shapes:
-            replace_in_shape(shape, replacements)
+            replace_in_shape(
+                shape,
+                replacements,
+                placeholder_values,
+                presentation.slide_width,
+                slide.shapes,
+            )
 
     remove_slides_by_index(presentation, slides_to_remove)
 
