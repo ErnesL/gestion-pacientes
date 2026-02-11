@@ -2,7 +2,8 @@
 *.MOV
 *.mp4
 # Source material/
-Oferta inicial/
+oferta-inicial/
+src-material/
 
 # Ignorar entornos virtuales (si usas Python)
 venv/
