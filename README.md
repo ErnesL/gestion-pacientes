@@ -1,13 +1,10 @@
-# Generador de informes (Excel → PDF)
+# Generador de informes (Excel → PPTX)
 
-Este proyecto genera 2 PDFs a partir del Excel del nutricionista:
-- Plan de Alimentación
-- Informe Antropométrico
+Este proyecto genera el **Plan de Alimentación** en formato PPTX a partir del Excel del nutricionista, usando una plantilla base con placeholders.
 
 ## Requisitos
 - Python 3.10+
 - Dependencias: ver `requirements.txt`
-- WeasyPrint requiere dependencias del sistema (Windows) para renderizar PDF.
 
 ## Uso
 1) Instala dependencias:
@@ -16,14 +13,17 @@ Este proyecto genera 2 PDFs a partir del Excel del nutricionista:
 pip install -r requirements.txt
 ```
 
-2) Genera los PDFs:
+2) Genera el PPTX:
 
 ```bash
-python src/generate_reports.py "ruta/al/archivo.xlsx"
+python src/generate_pptx.py "ruta/al/archivo.xlsx" \
+  --template "Source material/Plan de Alimentación Base.pptx" \
+  --output "output/Plan Alimentacion.pptx"
 ```
 
-Los PDFs se guardan en `output/`.
+El PPTX se guarda en `output/`.
 
 ## Notas
 - Los campos de Objetivo/Metas/Observaciones quedan en blanco para que el nutricionista los complete manualmente.
 - El próximo control se calcula automáticamente como fecha de hoy + 6 semanas.
+- Para exportar a PDF, abre el PPTX en PowerPoint y usa **Archivo → Exportar → Crear PDF**.
