@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
@@ -339,6 +339,13 @@ def iter_shapes(shapes):
         if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
             for subshape in iter_shapes(shape.shapes):
                 yield subshape
+
+
+def find_shape_by_name(slide, shape_name: str) -> Optional[object]:
+    for shape in iter_shapes(slide.shapes):
+        if (getattr(shape, "name", "") or "") == shape_name:
+            return shape
+    return None
 
 
 def align_marked_shapes(
