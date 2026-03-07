@@ -1,10 +1,11 @@
-# Generador de informes (Excel -> PPTX)
+# Generador de informes (Excel -> PPTX/PDF)
 
-Este proyecto genera el **Plan de Alimentación** y el **Informe Antropométrico** en formato PPTX a partir del Excel del nutricionista, usando plantillas base con placeholders.
+Este proyecto genera el **Plan de Alimentación** y el **Informe Antropométrico** a partir del Excel del nutricionista. En desarrollo puede ejecutarse por CLI, y para Windows incluye una GUI para generar ambos documentos en **PPTX y PDF**.
 
 ## Requisitos
 - Python 3.10+
 - Dependencias: ver `requirements.txt`
+- Para exportar PDF en Windows: Microsoft PowerPoint instalado
 
 ## Uso - Plan de Alimentación
 1) Instala dependencias:
@@ -61,6 +62,24 @@ En Windows:
 scripts\\run_anthro_pptx.bat
 ```
 
+## GUI para Windows
+La app de escritorio genera:
+- `Plan Alimentacion - {Paciente}.pptx`
+- `Plan Alimentacion - {Paciente}.pdf`
+- `Informe Antropometrico - {Paciente}.pptx`
+- `Informe Antropometrico - {Paciente}.pdf`
+
+Interfaz:
+- selector de Excel
+- selector de carpeta destino
+- un boton `Generar PPTXs`
+- panel de estado con errores y advertencias
+
+Comportamiento:
+- las plantillas se buscan en `templates/` junto al ejecutable
+- en desarrollo, si no existe `templates/`, se usa `src-material/`
+- si falla la exportacion a PDF, los PPTX se conservan y la app muestra advertencia
+
 ## Plantilla - Informe Antropométrico
 - La plantilla base debe vivir en `src-material/Informe Antropométrico base.pptx`.
 - Los textos variables se reemplazan con placeholders `{{...}}`.
@@ -78,4 +97,29 @@ scripts\\run_anthro_pptx.bat
 - En el informe antropométrico, `Metas Nutricionales`, `Diagnóstico`, `Observaciones` y `Meta Final` quedan para edición manual.
 - En el informe antropométrico, `Objetivo` se fija automáticamente en `PERDER GRASA`.
 - El próximo control se calcula automáticamente como fecha de hoy + 6 semanas (42 días).
-- Para exportar a PDF, abre el PPTX en PowerPoint y usa **Archivo → Exportar → Crear PDF**.
+- La exportacion a PDF automatica solo esta soportada en Windows y depende de PowerPoint instalado.
+
+## Build para Windows
+Instala dependencias de build:
+
+```bash
+pip install -r requirements-windows.txt
+```
+
+Genera la app:
+
+```bat
+scripts\\build_windows_app.bat
+```
+
+Genera el instalador:
+
+```bat
+scripts\\build_windows_installer.bat
+```
+
+Archivos relevantes:
+- GUI: `src/windows_gui.py`
+- Exportacion PDF: `src/pdf_export.py`
+- Orquestacion de documentos: `src/app_support.py`
+- Instalador Inno Setup: `packaging/windows/installer.iss`

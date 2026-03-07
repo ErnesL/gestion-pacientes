@@ -8,6 +8,8 @@ src-material/
 # Ignorar entornos virtuales (si usas Python)
 venv/
 __pycache__/
+build/
+dist/
 
 # Ignorar carpetas de sistema
 .DS_Store

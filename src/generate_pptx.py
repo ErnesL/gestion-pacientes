@@ -24,6 +24,9 @@ from pptx_helpers import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_TEMPLATE_PATH = PROJECT_ROOT / \
+    "src-material" / "Plan de Alimentación Base.pptx"
+DEFAULT_OUTPUT_PATH = PROJECT_ROOT / "output" / "Plan Alimentacion.pptx"
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,13 +34,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("excel", help="Ruta al archivo Excel")
     parser.add_argument(
         "--template",
-        default=str(PROJECT_ROOT / "src-material" /
-                    "Plan de Alimentación Base.pptx"),
+        default=str(DEFAULT_TEMPLATE_PATH),
         help="Ruta al PPTX base con placeholders",
     )
     parser.add_argument(
         "--output",
-        default=str(PROJECT_ROOT / "output" / "Plan Alimentacion.pptx"),
+        default=str(DEFAULT_OUTPUT_PATH),
         help="Ruta de salida PPTX",
     )
     return parser.parse_args()
@@ -51,27 +53,23 @@ def remove_slides_by_index(presentation: Presentation, indices: List[int]) -> No
         slide_id_list.remove(slide_id_list[index])
 
 
-def main() -> int:
-    args = parse_args()
-    excel_path = Path(args.excel)
-    template_path = Path(args.template)
-    output_path = Path(args.output)
+def generate_plan_pptx(
+    excel_path: Path | str,
+    template_path: Path | str = DEFAULT_TEMPLATE_PATH,
+    output_path: Path | str = DEFAULT_OUTPUT_PATH,
+) -> Path:
+    excel_path = Path(excel_path)
+    template_path = Path(template_path)
+    output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if not excel_path.exists():
-        print(f"No existe el archivo: {excel_path}")
-        return 1
+        raise FileNotFoundError(f"No existe el archivo: {excel_path}")
     if not template_path.exists():
-        print(f"No existe el PPTX base: {template_path}")
-        return 1
+        raise FileNotFoundError(f"No existe el PPTX base: {template_path}")
 
     wb = load_workbook(excel_path, data_only=True)
-
-    try:
-        patient = load_patient_info(wb)
-    except ValidationError as exc:
-        print(f"Error: {exc}")
-        return 1
+    patient = load_patient_info(wb)
 
     replacements = build_replacements(patient)
     ws_req = wb["REQUERIMIENTOS"]
@@ -114,6 +112,20 @@ def main() -> int:
     remove_slides_by_index(presentation, slides_to_remove)
 
     presentation.save(str(output_path))
+    return output_path
+
+
+def main() -> int:
+    args = parse_args()
+    try:
+        output_path = generate_plan_pptx(
+            excel_path=args.excel,
+            template_path=args.template,
+            output_path=args.output,
+        )
+    except (FileNotFoundError, ValidationError) as exc:
+        print(f"Error: {exc}")
+        return 1
     print(f"PPTX generado: {output_path}")
     return 0
 
