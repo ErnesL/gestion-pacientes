@@ -19,7 +19,7 @@ from pptx_helpers import replace_in_shape
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TEMPLATE_PATH = PROJECT_ROOT / \
-    "src-material" / "Informe Antropométrico base.pptx"
+    "templates" / "informe-antropometrico-base.pptx"
 DEFAULT_OUTPUT_PATH = PROJECT_ROOT / "output" / "Informe Antropometrico.pptx"
 
 

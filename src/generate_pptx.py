@@ -25,7 +25,7 @@ from pptx_helpers import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TEMPLATE_PATH = PROJECT_ROOT / \
-    "src-material" / "Plan de Alimentación Base.pptx"
+    "templates" / "plan-de-alimentacion-base.pptx"
 DEFAULT_OUTPUT_PATH = PROJECT_ROOT / "output" / "Plan Alimentacion.pptx"
 
 

@@ -17,8 +17,8 @@ from pdf_export import export_pptx_to_pdf
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PLAN_TEMPLATE_NAME = "Plan de Alimentación Base.pptx"
-ANTHRO_TEMPLATE_NAME = "Informe Antropométrico base.pptx"
+PLAN_TEMPLATE_NAME = "plan-de-alimentacion-base.pptx"
+ANTHRO_TEMPLATE_NAME = "informe-antropometrico-base.pptx"
 
 
 @dataclass
@@ -58,10 +58,7 @@ def resolve_app_root() -> Path:
 
 def resolve_template_dir() -> Path:
     app_root = resolve_app_root()
-    external_dir = app_root / "templates"
-    if external_dir.exists():
-        return external_dir
-    return PROJECT_ROOT / "src-material"
+    return app_root / "templates"
 
 
 def get_template_paths() -> dict[str, Path]:

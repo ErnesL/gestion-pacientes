@@ -2,7 +2,7 @@
 set -euo pipefail
 
 EXCEL_PATH="${1:-src-material/test.xlsx}"
-TEMPLATE_PATH="${2:-src-material/Informe Antropométrico base.pptx}"
+TEMPLATE_PATH="${2:-templates/informe-antropometrico-base.pptx}"
 OUTPUT_PATH="${3:-output/Informe Antropometrico - output.pptx}"
 TODAY="${4:-}"
 

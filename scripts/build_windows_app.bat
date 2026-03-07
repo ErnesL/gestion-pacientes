@@ -26,9 +26,9 @@ call ".venv\Scripts\pyinstaller.exe" ^
 if errorlevel 1 exit /b 1
 
 if not exist "dist\GestionPacientes\templates" mkdir "dist\GestionPacientes\templates"
-copy /Y "src-material\Plan de Alimentación Base.pptx" "dist\GestionPacientes\templates\" >nul
+copy /Y "templates\plan-de-alimentacion-base.pptx" "dist\GestionPacientes\templates\" >nul
 if errorlevel 1 exit /b 1
-copy /Y "src-material\Informe Antropométrico base.pptx" "dist\GestionPacientes\templates\" >nul
+copy /Y "templates\informe-antropometrico-base.pptx" "dist\GestionPacientes\templates\" >nul
 if errorlevel 1 exit /b 1
 
 echo Build listo en dist\GestionPacientes
