@@ -88,6 +88,26 @@ def replace_in_text_frame(text_frame, replacements: Dict[str, str]) -> None:
             run.text = ""
 
 
+def set_text_frame_text(text_frame, text: str) -> None:
+    if not text_frame.paragraphs:
+        paragraph = text_frame.add_paragraph()
+        paragraph.text = text
+        return
+
+    first_paragraph = text_frame.paragraphs[0]
+    if first_paragraph.runs:
+        first_paragraph.runs[0].text = text
+        for run in first_paragraph.runs[1:]:
+            run.text = ""
+    else:
+        first_paragraph.text = text
+
+    for paragraph in text_frame.paragraphs[1:]:
+        for run in paragraph.runs:
+            run.text = ""
+    remove_empty_paragraphs(text_frame)
+
+
 def remove_empty_paragraphs(text_frame) -> None:
     to_remove = []
     for paragraph in text_frame.paragraphs:
@@ -230,7 +250,7 @@ def find_image_slots(table, shape) -> Dict[str, Tuple[int, int, int, int]]:
 def replace_in_shape(
     shape,
     replacements: Dict[str, str],
-    placeholder_values: Dict[str, int],
+    placeholder_values: Dict[str, float],
     slide_width: int,
     slide_shapes,
     table_maps: List[TableColumnMap],
@@ -348,8 +368,27 @@ def find_shape_by_name(slide, shape_name: str) -> Optional[object]:
     return None
 
 
+def replace_meal_example_text(slide, example_text: str) -> bool:
+    replaced = False
+    for shape in iter_shapes(slide.shapes):
+        if not getattr(shape, "has_text_frame", False):
+            continue
+        full_text = "\n".join(
+            paragraph.text for paragraph in shape.text_frame.paragraphs if paragraph.text
+        ).strip()
+        normalized_text = normalize_label(full_text)
+        if "{{" in full_text and "EJEMPLO" in normalized_text:
+            set_text_frame_text(shape.text_frame, example_text)
+            replaced = True
+            continue
+        if normalized_text.startswith("EJEMPLO:"):
+            set_text_frame_text(shape.text_frame, example_text)
+            replaced = True
+    return replaced
+
+
 def align_marked_shapes(
-    slide, placeholder_values: Dict[str, int], table_maps: List[TableColumnMap]
+    slide, placeholder_values: Dict[str, float], table_maps: List[TableColumnMap]
 ) -> None:
     if not table_maps:
         return

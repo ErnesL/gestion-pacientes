@@ -10,6 +10,7 @@ from pptx import Presentation
 from excel_helpers import (
     MEAL_DEFS,
     ValidationError,
+    build_meal_example_texts,
     build_meal_replacements,
     build_replacements,
     build_totals_replacements,
@@ -18,6 +19,7 @@ from excel_helpers import (
 from pptx_helpers import (
     align_marked_shapes,
     apply_vertical_stack,
+    replace_meal_example_text,
     replace_in_shape,
     slide_contains_tokens,
 )
@@ -74,22 +76,33 @@ def generate_plan_pptx(
     replacements = build_replacements(patient)
     ws_req = wb["REQUERIMIENTOS"]
     replacements.update(build_totals_replacements(ws_req))
+    meal_example_texts = build_meal_example_texts(wb, ws_req)
 
     presentation = Presentation(str(template_path))
     slides_to_remove: List[int] = []
     meal_tokens_to_remove: List[List[str]] = []
-    placeholder_values: Dict[str, int] = {}
+    meal_tokens_by_name: Dict[str, List[str]] = {}
+    placeholder_values: Dict[str, float] = {}
 
     for meal_def in MEAL_DEFS:
         meal_repl, _, include_meal, tokens, meal_placeholder_values = build_meal_replacements(
             ws_req, meal_def
         )
         replacements.update(meal_repl)
+        if meal_def["name"] in meal_example_texts:
+            example_placeholder = "{{" + meal_def["name"] + "_EJEMPLO}}"
+            replacements[example_placeholder] = meal_example_texts[meal_def["name"]]
         placeholder_values.update(meal_placeholder_values)
+        meal_tokens_by_name[meal_def["name"]] = tokens
         if not include_meal:
             meal_tokens_to_remove.append(tokens)
 
     for idx, slide in enumerate(presentation.slides):
+        slide_meal_name = None
+        for meal_name, tokens in meal_tokens_by_name.items():
+            if slide_contains_tokens(slide, tokens):
+                slide_meal_name = meal_name
+                break
         for tokens in meal_tokens_to_remove:
             if slide_contains_tokens(slide, tokens):
                 slides_to_remove.append(idx)
@@ -108,6 +121,9 @@ def generate_plan_pptx(
             )
         align_marked_shapes(slide, placeholder_values, table_maps)
         apply_vertical_stack(slide)
+        if slide_meal_name and slide_meal_name in meal_example_texts:
+            replace_meal_example_text(
+                slide, meal_example_texts[slide_meal_name])
 
     remove_slides_by_index(presentation, slides_to_remove)
 
