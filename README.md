@@ -29,7 +29,7 @@ pip install -r requirements.txt
 Genera el plan:
 
 ```bash
-python src/generate_pptx.py "ruta/al/archivo.xlsx" \
+python src/generate_pptx.py "src/ayuda.xlsx" \
   --template "templates/plan-de-alimentacion-base.pptx" \
   --output "output/Plan Alimentacion.pptx"
 ```
@@ -37,7 +37,7 @@ python src/generate_pptx.py "ruta/al/archivo.xlsx" \
 Genera el informe antropometrico:
 
 ```bash
-python src/generate_anthro_pptx.py "ruta/al/archivo.xlsx" \
+python src/generate_anthro_pptx.py "ayuda.xlsx" \
   --template "templates/informe-antropometrico-base.pptx" \
   --output "output/Informe Antropometrico.pptx"
 ```
@@ -48,6 +48,26 @@ Prueba rapida con scripts:
 ./scripts/run_pptx.sh
 bash ./scripts/run_anthro_pptx.sh
 ```
+
+## Hojas obligatorias
+El parser usa `HISTORIA` para los datos del paciente y exige nuestras hojas para plan y antropometría. Si estas hojas no existen o están incompletas, la generación falla:
+
+- `PLAN_ALIMENTACION_TEMPLATE`
+  - Columnas requeridas en la fila 1: `COMIDA`, `LACTEOS`, `VEGETALES`, `FRUTAS`, `ALMIDONES`, `PROTEINAS`, `GRASAS`
+  - Comidas permitidas: `PRE`, `DES`, `MAM`, `ALM`, `MTP`, `CEN`
+- `ANTROPOMETRIA_TEMPLATE`
+  - Columnas requeridas en la fila 1: `SECCION`, `ETIQUETA`, `VALOR`
+  - Secciones permitidas: `RESUMEN`, `MEDIDAS`
+
+Hay un ejemplo listo para copiar en:
+
+```bash
+examples/ejemplo-template-codex.xlsx
+```
+
+Ese archivo es una referencia para copiar las hojas dentro del Excel real del cliente.
+
+No hay compatibilidad con layouts viejos del cliente en `REQUERIMIENTOS` ni `RESUMEN ANTROPOMETRICO`. Si quieren generar documentos, deben llenar nuestras hojas.
 
 ## Windows
 Instala dependencias de build:

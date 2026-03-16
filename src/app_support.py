@@ -10,7 +10,7 @@ from typing import Callable
 
 from openpyxl import load_workbook
 
-from excel_helpers import ValidationError
+from excel_helpers import ValidationError, load_patient_info
 from generate_anthro_pptx import generate_anthro_pptx
 from generate_pptx import generate_plan_pptx
 from pdf_export import export_pptx_to_pdf
@@ -89,12 +89,7 @@ def unique_stem(output_dir: Path, stem: str, suffixes: list[str]) -> str:
 
 def load_patient_name(excel_path: Path) -> str:
     wb = load_workbook(excel_path, data_only=True)
-    if "HISTORIA" not in wb.sheetnames:
-        raise ValidationError("No existe la hoja requerida: HISTORIA")
-    name = str(wb["HISTORIA"]["C4"].value or "").strip()
-    if not name:
-        raise ValidationError("Falta campo: Nombre y Apellido (HISTORIA!C4)")
-    return name
+    return load_patient_info(wb).name
 
 
 def build_output_stems(output_dir: Path, patient_name: str) -> dict[str, str]:

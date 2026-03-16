@@ -4,8 +4,6 @@ from datetime import date, datetime, timedelta
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
-from openpyxl.utils.cell import column_index_from_string
-
 
 @dataclass
 class PatientInfo:
@@ -41,6 +39,9 @@ class ExampleFood:
     singular_text: str
     plural_text: str
 
+
+PLAN_TEMPLATE_SHEET = "PLAN_ALIMENTACION_TEMPLATE"
+ANTHRO_TEMPLATE_SHEET = "ANTROPOMETRIA_TEMPLATE"
 
 GROUP_ROWS = {
     "L": 48,  # Lacteos (Leche)
@@ -383,14 +384,6 @@ def value_is_missing(value) -> bool:
     return False
 
 
-def require_cell_value(ws, cell_ref: str, field_label: str):
-    value = ws[cell_ref].value
-    if value_is_missing(value):
-        raise ValidationError(
-            f"Falta campo: {field_label} ({ws.title}!{cell_ref})")
-    return value
-
-
 def to_age_text(value) -> str:
     if isinstance(value, (int, float)):
         return str(int(round(value)))
@@ -449,22 +442,20 @@ def normalize_lookup_label(value: str) -> str:
     return " ".join(normalized.split())
 
 
-def find_labeled_value(
-    ws,
-    target_label: str,
-    label_col: str,
-    value_col: str,
-    start_row: int,
-    end_row: int,
-):
-    expected = normalize_lookup_label(target_label)
-    for row_idx in range(start_row, end_row + 1):
-        current_label = ws[f"{label_col}{row_idx}"].value
-        if current_label is None:
+def build_sheet_headers(ws, header_row: int = 1) -> Dict[str, int]:
+    headers: Dict[str, int] = {}
+    for cell in ws[header_row]:
+        if cell.value is None:
             continue
-        if normalize_lookup_label(str(current_label)) == expected:
-            return ws[f"{value_col}{row_idx}"].value
-    return None
+        headers[normalize_lookup_label(str(cell.value))] = cell.column
+    return headers
+
+
+def empty_meal_distribution() -> Dict[str, Dict[str, float]]:
+    return {
+        meal_def["name"]: {group_code: 0.0 for group_code in GROUP_ROWS}
+        for meal_def in MEAL_DEFS
+    }
 
 
 def normalize_food_name(value: str) -> str:
@@ -667,118 +658,177 @@ def load_examples_sheet(wb) -> Dict[str, Dict[str, str]]:
     return meal_rows
 
 
-def read_range_values(
-    ws,
-    start_col: str,
-    end_col: str,
-    start_row: int,
-    end_row: int,
-) -> List[List[str]]:
-    start_col_idx = column_index_from_string(start_col)
-    end_col_idx = column_index_from_string(end_col)
-    values: List[List[str]] = []
-    for row in ws.iter_rows(
-        min_row=start_row,
-        max_row=end_row,
-        min_col=start_col_idx,
-        max_col=end_col_idx,
-    ):
-        values.append([format_table_value(cell.value) for cell in row])
-    return values
-
-
-def read_selected_columns(
-    ws,
-    cols: List[str],
-    start_row: int,
-    end_row: int,
-) -> List[List[str]]:
-    values: List[List[str]] = []
-    for row_idx in range(start_row, end_row + 1):
-        values.append(
-            [format_table_value(ws[f"{col}{row_idx}"].value) for col in cols])
-    return values
-
-
-def load_anthropometric_data(wb) -> AnthropometricReportData:
-    ws_history = require_sheet(wb, "HISTORIA")
-    ws_summary = require_sheet(wb, "RESUMEN ANTROPOMETRICO")
-
-    full_name = str(require_cell_value(
-        ws_history, "C4", "Nombre y Apellido")).strip()
-    ci = str(require_cell_value(ws_history, "C5", "Cedula")).strip()
-    age = to_age_text(require_cell_value(ws_history, "C7", "Edad"))
-    discipline = str(ws_history["I8"].value or "").strip()
-    sex = str(ws_history["C10"].value or "").strip()
-
-    patient = PatientInfo(
-        name=full_name,
-        ci=ci,
-        sex=sex,
-        age=age,
-        discipline=discipline,
-    )
-
-    peso_corporal = format_decimal(
-        require_cell_value(
-            ws_summary,
-            "F6",
-            "Peso corporal (RESUMEN ANTROPOMETRICO!F6)",
+def load_plan_template_distribution(wb) -> Dict[str, Dict[str, float]]:
+    ws = require_sheet(wb, PLAN_TEMPLATE_SHEET)
+    headers = build_sheet_headers(ws)
+    required_headers = ["COMIDA", *EXAMPLE_GROUP_HEADERS.keys()]
+    missing_headers = [
+        header for header in required_headers if header not in headers]
+    if missing_headers:
+        raise ValidationError(
+            f"Faltan columnas en {PLAN_TEMPLATE_SHEET}: " +
+            ", ".join(missing_headers)
         )
-    )
-    estatura_value = find_labeled_value(
-        ws_summary,
-        target_label="Talla (m)",
-        label_col="E",
-        value_col="F",
-        start_row=36,
-        end_row=61,
-    )
-    if value_is_missing(estatura_value):
-        estatura_value = ws_summary["F38"].value
+
+    distribution = empty_meal_distribution()
+    seen_meals: set[str] = set()
+
+    for row_idx in range(2, ws.max_row + 1):
+        meal_value = ws.cell(row=row_idx, column=headers["COMIDA"]).value
+        if value_is_missing(meal_value):
+            continue
+
+        meal_name = normalize_lookup_label(str(meal_value))
+        if meal_name not in distribution:
+            raise ValidationError(
+                f"Comida no reconocida en {PLAN_TEMPLATE_SHEET}!A{row_idx}: {meal_value}"
+            )
+        if meal_name in seen_meals:
+            raise ValidationError(
+                f"La comida {meal_name} está repetida en {PLAN_TEMPLATE_SHEET}"
+            )
+
+        for header_name, group_code in EXAMPLE_GROUP_HEADERS.items():
+            col_idx = headers[header_name]
+            distribution[meal_name][group_code] = to_number(
+                ws.cell(row=row_idx, column=col_idx).value
+            )
+
+        seen_meals.add(meal_name)
+
+    return distribution
+
+
+def load_meal_distribution(wb) -> Dict[str, Dict[str, float]]:
+    return load_plan_template_distribution(wb)
+
+
+def build_label_lookup(rows: List[Tuple[str, object]]) -> Dict[str, object]:
+    return {
+        normalize_lookup_label(label): value
+        for label, value in rows
+        if label.strip()
+    }
+
+
+def value_from_lookup(
+    lookup: Dict[str, object],
+    labels: List[str],
+) -> object | None:
+    for label in labels:
+        normalized = normalize_lookup_label(label)
+        if normalized in lookup and not value_is_missing(lookup[normalized]):
+            return lookup[normalized]
+    return None
+
+
+def anthropometric_data_from_rows(
+    patient: PatientInfo,
+    summary_rows_raw: List[Tuple[str, object]],
+    measurement_rows_raw: List[Tuple[str, object]],
+) -> AnthropometricReportData:
+    summary_lookup = build_label_lookup(summary_rows_raw)
+    measurement_lookup = build_label_lookup(measurement_rows_raw)
+
+    peso_corporal_value = value_from_lookup(
+        summary_lookup, ["Peso (Kg)", "Peso actual (kg)"])
+    if value_is_missing(peso_corporal_value):
+        raise ValidationError(
+            "Falta campo: Peso corporal en la tabla resumen antropométrica"
+        )
+
+    estatura_value = value_from_lookup(measurement_lookup, ["Talla (m)"])
     if value_is_missing(estatura_value):
         raise ValidationError(
-            "Falta campo: Estatura (etiqueta 'Talla (m)' en RESUMEN ANTROPOMETRICO!E36:F61)"
+            "Falta campo: Talla (m) en la tabla de medidas antropométricas"
         )
-    estatura = format_decimal(estatura_value)
-    masa_grasa = format_decimal(
-        require_cell_value(
-            ws_summary,
-            "F12",
-            "Masa grasa (RESUMEN ANTROPOMETRICO!F12)",
-        )
-    )
-    pct_grasa = format_decimal(
-        require_cell_value(
-            ws_summary,
-            "F8",
-            "% Grasa Carter (RESUMEN ANTROPOMETRICO!F8)",
-        )
-    )
 
-    table_resumen = read_selected_columns(
-        ws_summary,
-        cols=["D", "F"],
-        start_row=4,
-        end_row=16,
-    )
-    table_medidas = read_range_values(
-        ws_summary,
-        start_col="E",
-        end_col="F",
-        start_row=36,
-        end_row=61,
-    )
+    masa_grasa_value = value_from_lookup(summary_lookup, ["Kg de Grasa"])
+    if value_is_missing(masa_grasa_value):
+        raise ValidationError(
+            "Falta campo: Kg de Grasa en la tabla resumen antropométrica"
+        )
+
+    pct_grasa_value = value_from_lookup(
+        summary_lookup, ["% Grasa (Carter 1986)"])
+    if value_is_missing(pct_grasa_value):
+        raise ValidationError(
+            "Falta campo: % Grasa (Carter 1986) en la tabla resumen antropométrica"
+        )
 
     return AnthropometricReportData(
         patient=patient,
-        peso_corporal_kg=peso_corporal,
-        estatura_m=estatura,
-        masa_grasa_kg=masa_grasa,
-        pct_grasa_carter=pct_grasa,
-        table_resumen=table_resumen,
-        table_medidas=table_medidas,
+        peso_corporal_kg=format_decimal(peso_corporal_value),
+        estatura_m=format_decimal(estatura_value),
+        masa_grasa_kg=format_decimal(masa_grasa_value),
+        pct_grasa_carter=format_decimal(pct_grasa_value),
+        table_resumen=[
+            [format_table_value(label), format_table_value(value)]
+            for label, value in summary_rows_raw
+        ],
+        table_medidas=[
+            [format_table_value(label), format_table_value(value)]
+            for label, value in measurement_rows_raw
+        ],
     )
+
+
+def load_anthropometric_template_data(
+    wb,
+    patient: PatientInfo,
+) -> AnthropometricReportData:
+    ws = require_sheet(wb, ANTHRO_TEMPLATE_SHEET)
+    headers = build_sheet_headers(ws)
+    required_headers = ["SECCION", "ETIQUETA", "VALOR"]
+    missing_headers = [
+        header for header in required_headers if header not in headers]
+    if missing_headers:
+        raise ValidationError(
+            f"Faltan columnas en {ANTHRO_TEMPLATE_SHEET}: " +
+            ", ".join(missing_headers)
+        )
+
+    summary_rows_raw: List[Tuple[str, object]] = []
+    measurement_rows_raw: List[Tuple[str, object]] = []
+
+    for row_idx in range(2, ws.max_row + 1):
+        section_value = ws.cell(row=row_idx, column=headers["SECCION"]).value
+        label_value = ws.cell(row=row_idx, column=headers["ETIQUETA"]).value
+        value = ws.cell(row=row_idx, column=headers["VALOR"]).value
+
+        if value_is_missing(section_value) and value_is_missing(label_value):
+            continue
+        if value_is_missing(section_value) or value_is_missing(label_value):
+            raise ValidationError(
+                f"Cada fila de {ANTHRO_TEMPLATE_SHEET} requiere SECCION y ETIQUETA"
+            )
+
+        section = normalize_lookup_label(str(section_value))
+        row = (str(label_value).strip(), value)
+        if section == "RESUMEN":
+            summary_rows_raw.append(row)
+        elif section in {"MEDIDAS", "MEDIDA"}:
+            measurement_rows_raw.append(row)
+        else:
+            raise ValidationError(
+                f"Sección no reconocida en {ANTHRO_TEMPLATE_SHEET}!A{row_idx}: {section_value}"
+            )
+
+    if not summary_rows_raw or not measurement_rows_raw:
+        raise ValidationError(
+            f"La hoja {ANTHRO_TEMPLATE_SHEET} debe incluir filas de RESUMEN y MEDIDAS"
+        )
+
+    return anthropometric_data_from_rows(
+        patient=patient,
+        summary_rows_raw=summary_rows_raw,
+        measurement_rows_raw=measurement_rows_raw,
+    )
+
+
+def load_anthropometric_data(wb) -> AnthropometricReportData:
+    patient = load_patient_info(wb)
+    return load_anthropometric_template_data(wb, patient)
 
 
 def month_name_es(reference_date: date) -> str:
@@ -848,11 +898,12 @@ def build_replacements(patient: PatientInfo) -> Dict[str, str]:
 
 
 def build_meal_replacements(
-    ws, meal_def
+    meal_distribution: Dict[str, Dict[str, float]], meal_def
 ) -> Tuple[Dict[str, str], Dict[str, float], bool, List[str], Dict[str, float]]:
-    values = {}
-    for code, row in GROUP_ROWS.items():
-        values[code] = to_number(ws[f"{meal_def['col']}{row}"].value)
+    values = {
+        code: to_number(meal_distribution.get(meal_def["name"], {}).get(code))
+        for code in GROUP_ROWS
+    }
 
     replacements = {}
     for code, suffix in GROUP_SUFFIX.items():
@@ -873,7 +924,9 @@ def build_meal_replacements(
     return replacements, values, include, tokens, placeholder_values
 
 
-def build_meal_example_texts(wb, ws_req) -> Dict[str, str]:
+def build_meal_example_texts(
+    wb, meal_distribution: Dict[str, Dict[str, float]]
+) -> Dict[str, str]:
     meal_rows = load_examples_sheet(wb)
     if not meal_rows:
         return {}
@@ -882,11 +935,10 @@ def build_meal_example_texts(wb, ws_req) -> Dict[str, str]:
     example_texts: Dict[str, str] = {}
     for meal_def in MEAL_DEFS:
         meal_name = meal_def["name"]
-        servings = {
-            code: to_number(
-                ws_req[f"{meal_def['col']}{GROUP_ROWS[code]}"].value)
-            for code in GROUP_ROWS
-        }
+        servings = meal_distribution.get(
+            meal_name,
+            {group_code: 0.0 for group_code in GROUP_ROWS},
+        )
         needs_example = any(
             servings[group_code] > 0 for group_code in meal_def["groups"]
         )
@@ -931,15 +983,15 @@ def build_meal_example_texts(wb, ws_req) -> Dict[str, str]:
     return example_texts
 
 
-def build_totals_replacements(ws) -> Dict[str, str]:
-    totals_col = "T"
+def build_totals_replacements(
+    meal_distribution: Dict[str, Dict[str, float]]
+) -> Dict[str, str]:
     totals = {
-        "L": to_number(ws[f"{totals_col}{GROUP_ROWS['L']}"].value),
-        "V": to_number(ws[f"{totals_col}{GROUP_ROWS['V']}"].value),
-        "F": to_number(ws[f"{totals_col}{GROUP_ROWS['F']}"].value),
-        "A": to_number(ws[f"{totals_col}{GROUP_ROWS['A']}"].value),
-        "P": to_number(ws[f"{totals_col}{GROUP_ROWS['P']}"].value),
-        "G": to_number(ws[f"{totals_col}{GROUP_ROWS['G']}"].value),
+        group_code: sum(
+            meal_distribution[meal_name][group_code]
+            for meal_name in meal_distribution
+        )
+        for group_code in GROUP_ROWS
     }
     return {
         "{{TOTAL_LACTEOS}}": "" if totals["L"] == 0 else format_quantity(totals["L"]),

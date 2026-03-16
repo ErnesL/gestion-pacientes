@@ -14,6 +14,7 @@ from excel_helpers import (
     build_meal_replacements,
     build_replacements,
     build_totals_replacements,
+    load_meal_distribution,
     load_patient_info,
 )
 from pptx_helpers import (
@@ -72,11 +73,11 @@ def generate_plan_pptx(
 
     wb = load_workbook(excel_path, data_only=True)
     patient = load_patient_info(wb)
+    meal_distribution = load_meal_distribution(wb)
 
     replacements = build_replacements(patient)
-    ws_req = wb["REQUERIMIENTOS"]
-    replacements.update(build_totals_replacements(ws_req))
-    meal_example_texts = build_meal_example_texts(wb, ws_req)
+    replacements.update(build_totals_replacements(meal_distribution))
+    meal_example_texts = build_meal_example_texts(wb, meal_distribution)
 
     presentation = Presentation(str(template_path))
     slides_to_remove: List[int] = []
@@ -86,7 +87,7 @@ def generate_plan_pptx(
 
     for meal_def in MEAL_DEFS:
         meal_repl, _, include_meal, tokens, meal_placeholder_values = build_meal_replacements(
-            ws_req, meal_def
+            meal_distribution, meal_def
         )
         replacements.update(meal_repl)
         if meal_def["name"] in meal_example_texts:
