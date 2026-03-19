@@ -10,7 +10,13 @@ from typing import Callable
 
 from openpyxl import load_workbook
 
-from excel_helpers import ValidationError, load_patient_info
+from excel_helpers import (
+    ParsedWorkbookData,
+    ValidationError,
+    build_validation_error_message,
+    format_preview_text,
+    inspect_workbook,
+)
 from generate_anthro_pptx import generate_anthro_pptx
 from generate_pptx import generate_plan_pptx
 from pdf_export import export_pptx_to_pdf
@@ -33,6 +39,7 @@ class GeneratedDocument:
 class GenerationResult:
     patient_name: str
     documents: list[GeneratedDocument]
+    preview_text: str = ""
 
     @property
     def warnings(self) -> list[str]:
@@ -88,8 +95,15 @@ def unique_stem(output_dir: Path, stem: str, suffixes: list[str]) -> str:
 
 
 def load_patient_name(excel_path: Path) -> str:
+    inspection = inspect_excel_file(excel_path)
+    if inspection.has_blocking_issues:
+        raise ValidationError(build_validation_error_message(inspection.issues))
+    return inspection.patient.name
+
+
+def inspect_excel_file(excel_path: Path | str) -> ParsedWorkbookData:
     wb = load_workbook(excel_path, data_only=True)
-    return load_patient_info(wb).name
+    return inspect_workbook(wb)
 
 
 def build_output_stems(output_dir: Path, patient_name: str) -> dict[str, str]:
@@ -122,6 +136,7 @@ def generate_all_documents(
     output_dir: Path | str,
     log: Callable[[str], None],
     today: date | None = None,
+    parsed_data: ParsedWorkbookData | None = None,
 ) -> GenerationResult:
     excel_path = Path(excel_path)
     output_dir = Path(output_dir)
@@ -130,7 +145,11 @@ def generate_all_documents(
     log("Validando rutas y templates")
     validate_inputs(excel_path, output_dir)
 
-    patient_name = load_patient_name(excel_path)
+    inspection = parsed_data or inspect_excel_file(excel_path)
+    if inspection.has_blocking_issues:
+        raise ValidationError(build_validation_error_message(inspection.issues))
+
+    patient_name = inspection.patient.name
     stems = build_output_stems(output_dir, patient_name)
     documents = [
         GeneratedDocument(label="Plan de Alimentación"),
@@ -154,6 +173,7 @@ def generate_all_documents(
             excel_path=excel_path,
             template_path=template_paths["plan"],
             output_path=plan_doc.pptx_path,
+            parsed_data=inspection,
         )
     except Exception as exc:
         plan_doc.errors.append(f"No se pudo generar el PPTX del plan: {exc}")
@@ -171,6 +191,7 @@ def generate_all_documents(
             template_path=template_paths["anthro"],
             output_path=anthro_doc.pptx_path,
             today=today,
+            parsed_data=inspection,
         )
     except Exception as exc:
         anthro_doc.errors.append(
@@ -203,4 +224,8 @@ def generate_all_documents(
             raise ValidationError("\n".join(all_errors))
         raise ValidationError("No se generó ningún archivo.")
 
-    return GenerationResult(patient_name=patient_name, documents=documents)
+    return GenerationResult(
+        patient_name=patient_name,
+        documents=documents,
+        preview_text=format_preview_text(inspection),
+    )

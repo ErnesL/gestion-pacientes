@@ -9,7 +9,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
-from app_support import GenerationResult, generate_all_documents
+from app_support import GenerationResult, generate_all_documents, inspect_excel_file
+from excel_helpers import build_validation_error_message, format_preview_text
 
 
 @dataclass
@@ -82,14 +83,36 @@ class GestionPacientesApp:
         ttk.Label(status_frame, textvariable=self.status_var).grid(
             row=0, column=0, sticky="w", pady=(0, 10))
 
-        self.log_widget = scrolledtext.ScrolledText(
-            status_frame,
+        notebook = ttk.Notebook(status_frame)
+        notebook.grid(row=1, column=0, sticky="nsew")
+
+        preview_frame = ttk.Frame(notebook, padding=4)
+        preview_frame.columnconfigure(0, weight=1)
+        preview_frame.rowconfigure(0, weight=1)
+        notebook.add(preview_frame, text="Resumen leido")
+
+        log_frame = ttk.Frame(notebook, padding=4)
+        log_frame.columnconfigure(0, weight=1)
+        log_frame.rowconfigure(0, weight=1)
+        notebook.add(log_frame, text="Log")
+
+        self.preview_widget = scrolledtext.ScrolledText(
+            preview_frame,
             wrap="word",
             height=16,
             font=("Consolas", 10),
             state="disabled",
         )
-        self.log_widget.grid(row=1, column=0, sticky="nsew")
+        self.preview_widget.grid(row=0, column=0, sticky="nsew")
+
+        self.log_widget = scrolledtext.ScrolledText(
+            log_frame,
+            wrap="word",
+            height=16,
+            font=("Consolas", 10),
+            state="disabled",
+        )
+        self.log_widget.grid(row=0, column=0, sticky="nsew")
 
         self.generate_button = ttk.Button(
             frame,
@@ -111,6 +134,7 @@ class GestionPacientesApp:
         )
         if path:
             self.excel_var.set(path)
+            self._refresh_preview_from_selected_excel()
 
     def _choose_output_dir(self) -> None:
         path = filedialog.askdirectory(title="Selecciona la carpeta destino")
@@ -131,6 +155,38 @@ class GestionPacientesApp:
         self.log_widget.insert("end", text + "\n")
         self.log_widget.see("end")
         self.log_widget.configure(state="disabled")
+
+    def _set_preview(self, text: str) -> None:
+        self.preview_widget.configure(state="normal")
+        self.preview_widget.delete("1.0", "end")
+        self.preview_widget.insert("1.0", text)
+        self.preview_widget.see("1.0")
+        self.preview_widget.configure(state="disabled")
+
+    def _refresh_preview_from_selected_excel(self) -> None:
+        excel_path_text = self.excel_var.get().strip()
+        if not excel_path_text:
+            self._set_preview("Selecciona un Excel para ver el resumen leido.")
+            return
+
+        excel_path = Path(excel_path_text)
+        if not excel_path.exists():
+            self._set_preview(f"No existe el archivo Excel: {excel_path}")
+            self.status_var.set("Selecciona un Excel valido.")
+            return
+
+        try:
+            inspection = inspect_excel_file(excel_path)
+        except Exception as exc:
+            self._set_preview(f"No se pudo leer el Excel.\n\n{exc}")
+            self.status_var.set("No se pudo inspeccionar el Excel.")
+            return
+
+        self._set_preview(format_preview_text(inspection))
+        if inspection.has_blocking_issues:
+            self.status_var.set("Se detectaron errores en el Excel.")
+        else:
+            self.status_var.set("Excel validado. Listo para generar.")
 
     def _set_idle_status(self, text: str) -> None:
         self.worker_running = False
@@ -161,11 +217,29 @@ class GestionPacientesApp:
             self.queue.put(WorkerMessage(kind="log", text=text))
 
         try:
+            log("Inspeccionando Excel")
+            inspection = inspect_excel_file(excel_path)
+            self.queue.put(
+                WorkerMessage(
+                    kind="preview",
+                    text=format_preview_text(inspection),
+                )
+            )
+            if inspection.has_blocking_issues:
+                self.queue.put(
+                    WorkerMessage(
+                        kind="error",
+                        text=build_validation_error_message(inspection.issues),
+                    )
+                )
+                return
+
             result = generate_all_documents(
                 excel_path=excel_path,
                 output_dir=output_dir,
                 log=log,
                 today=date.today(),
+                parsed_data=inspection,
             )
         except Exception as exc:
             self.queue.put(
@@ -193,6 +267,10 @@ class GestionPacientesApp:
             self._append_log(message.text)
             return
 
+        if message.kind == "preview":
+            self._set_preview(message.text)
+            return
+
         if message.kind == "error":
             self._append_log("ERROR")
             self._append_log(message.text)
@@ -208,6 +286,9 @@ class GestionPacientesApp:
     def _render_result(self, result: GenerationResult) -> None:
         success_lines: list[str] = []
         warning_lines: list[str] = []
+
+        if result.preview_text:
+            self._set_preview(result.preview_text)
 
         for document in result.documents:
             if document.pptx_path is not None:

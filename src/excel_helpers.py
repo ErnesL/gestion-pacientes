@@ -1001,3 +1001,726 @@ def build_totals_replacements(
         "{{TOTAL_PROTEINAS}}": "" if totals["P"] == 0 else format_quantity(totals["P"]),
         "{{TOTAL_GRASAS}}": "" if totals["G"] == 0 else format_quantity(totals["G"]),
     }
+
+
+@dataclass
+class ValidationIssue:
+    section: str
+    message: str
+    sheet: str = ""
+    location: str = ""
+    field: str = ""
+    expected: str = ""
+    actual_value: str = ""
+    severity: str = "error"
+
+    @property
+    def is_blocking(self) -> bool:
+        return self.severity == "error"
+
+
+@dataclass
+class ParsedWorkbookData:
+    patient: PatientInfo
+    meal_distribution: Dict[str, Dict[str, float]]
+    meal_totals: Dict[str, float]
+    anthro_data: AnthropometricReportData
+    meal_examples: Dict[str, str]
+    issues: List[ValidationIssue]
+    examples_status: str
+
+    @property
+    def has_blocking_issues(self) -> bool:
+        return any(issue.is_blocking for issue in self.issues)
+
+
+SECTION_PATIENT = "Paciente / HISTORIA"
+SECTION_PLAN = "Plan / PLAN_ALIMENTACION_TEMPLATE"
+SECTION_ANTHRO = "Antropometria / ANTROPOMETRIA_TEMPLATE"
+SECTION_EXAMPLES = "Ejemplos / EJEMPLOS_COMIDAS"
+SECTION_ORDER = [
+    SECTION_PATIENT,
+    SECTION_PLAN,
+    SECTION_ANTHRO,
+    SECTION_EXAMPLES,
+]
+
+ANTHRO_REQUIRED_SUMMARY_LABELS = [
+    "Evaluación",
+    "Fecha",
+    "Peso (Kg)",
+    "Talla parada (cm)",
+    "% Grasa (Carter 1986)",
+    "% Grasa (Durnin y W. 1974)",
+    "Interpretación",
+    "Kg de Masa Magra",
+    "Kg de Grasa",
+    "Masa Muscular (Kg)",
+    "Masa Adiposa (Kg)",
+    "Sumatoria de 6 pliegues",
+    "Somatotipo",
+]
+
+ANTHRO_REQUIRED_MEASUREMENT_LABELS = [
+    "Fecha de evaluación",
+    "Peso actual (kg)",
+    "Talla (m)",
+    "Talla (cm)",
+    "Circunferencias(cm)",
+    "Brazo relajado (cm)",
+    "Brazo Flexionado en Tensión (cm)",
+    "Antebrazo máximo (cm)",
+    "Tórax (Mesoesternal) (cm)",
+    "Cintura mínimo (cm)",
+    "Cadera máximo (cm)",
+    "Muslo máximo (cm)",
+    "Muslo medial (cm)",
+    "Pantorrilla máximo (cm)",
+    "Pliegues (mm)",
+    "Bíceps (mm)",
+    "Tríceps (mm)",
+    "Subescapular (mm)",
+    "Ileo-crestal (mm)",
+    "Supra-espinal (mm)",
+    "Abdominal (mm)",
+    "Muslo frontal (mm)",
+    "Pantorrilla (mm)",
+    "Diametros óseos (cm)",
+    "Humeral (Biepicondilar)",
+    "Femoral (Biepicondilar)",
+]
+
+
+def blank_patient_info() -> PatientInfo:
+    return PatientInfo(name="", ci="", sex="", age="", discipline="")
+
+
+def blank_anthro_data(patient: PatientInfo) -> AnthropometricReportData:
+    return AnthropometricReportData(
+        patient=patient,
+        peso_corporal_kg="",
+        estatura_m="",
+        masa_grasa_kg="",
+        pct_grasa_carter="",
+        table_resumen=[],
+        table_medidas=[],
+    )
+
+
+def make_issue(
+    section: str,
+    message: str,
+    sheet: str = "",
+    location: str = "",
+    field: str = "",
+    expected: str = "",
+    actual_value: str = "",
+    severity: str = "error",
+) -> ValidationIssue:
+    return ValidationIssue(
+        section=section,
+        message=message,
+        sheet=sheet,
+        location=location,
+        field=field,
+        expected=expected,
+        actual_value=actual_value,
+        severity=severity,
+    )
+
+
+def format_actual_value(value) -> str:
+    rendered = format_table_value(value)
+    return rendered if rendered else "vacio"
+
+
+def parse_number_with_issue(
+    value,
+    *,
+    section: str,
+    sheet: str,
+    location: str,
+    field: str,
+    issues: List[ValidationIssue],
+) -> float:
+    if value_is_missing(value):
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip().replace(",", ".")
+    try:
+        return float(text)
+    except ValueError:
+        issues.append(
+            make_issue(
+                section=section,
+                message=f"El valor de {field} debe ser numerico.",
+                sheet=sheet,
+                location=location,
+                field=field,
+                expected="numero",
+                actual_value=format_actual_value(value),
+            )
+        )
+        return 0.0
+
+
+def calculate_meal_totals(
+    meal_distribution: Dict[str, Dict[str, float]]
+) -> Dict[str, float]:
+    return {
+        group_code: sum(
+            meal_distribution[meal_name][group_code]
+            for meal_name in meal_distribution
+        )
+        for group_code in GROUP_ROWS
+    }
+
+
+def inspect_patient_info(wb, issues: List[ValidationIssue]) -> PatientInfo:
+    if "HISTORIA" not in wb.sheetnames:
+        issues.append(
+            make_issue(
+                section=SECTION_PATIENT,
+                message="Falta la hoja HISTORIA.",
+                sheet="HISTORIA",
+                expected="Hoja HISTORIA con datos del paciente",
+            )
+        )
+        return blank_patient_info()
+
+    ws = wb["HISTORIA"]
+    name = str(ws["C4"].value or "").strip()
+    ci = str(ws["C5"].value or "").strip()
+    sex = str(ws["C10"].value or "").strip()
+    discipline = str(ws["I8"].value or "").strip()
+    age = to_age_text(ws["C7"].value)
+
+    required_fields = [
+        ("Nombre y Apellido", "C4", name),
+        ("Cedula", "C5", ci),
+        ("Edad", "C7", age),
+        ("Sexo", "C10", sex),
+    ]
+    for field_name, location, value in required_fields:
+        if value_is_missing(value):
+            issues.append(
+                make_issue(
+                    section=SECTION_PATIENT,
+                    message=f"Falta el campo {field_name}.",
+                    sheet="HISTORIA",
+                    location=location,
+                    field=field_name,
+                    expected="valor no vacio",
+                    actual_value="vacio",
+                )
+            )
+
+    return PatientInfo(
+        name=name,
+        ci=ci,
+        sex=sex,
+        age=age,
+        discipline=discipline,
+    )
+
+
+def inspect_plan_distribution(
+    wb,
+    issues: List[ValidationIssue],
+) -> Dict[str, Dict[str, float]]:
+    distribution = empty_meal_distribution()
+    if PLAN_TEMPLATE_SHEET not in wb.sheetnames:
+        issues.append(
+            make_issue(
+                section=SECTION_PLAN,
+                message=f"Falta la hoja obligatoria {PLAN_TEMPLATE_SHEET}.",
+                sheet=PLAN_TEMPLATE_SHEET,
+                expected="Hoja con columnas COMIDA, LACTEOS, VEGETALES, FRUTAS, ALMIDONES, PROTEINAS, GRASAS",
+            )
+        )
+        return distribution
+
+    ws = wb[PLAN_TEMPLATE_SHEET]
+    headers = build_sheet_headers(ws)
+    required_headers = ["COMIDA", *EXAMPLE_GROUP_HEADERS.keys()]
+    missing_headers = [
+        header for header in required_headers if header not in headers]
+    if missing_headers:
+        issues.append(
+            make_issue(
+                section=SECTION_PLAN,
+                message="Faltan columnas obligatorias en la hoja del plan.",
+                sheet=PLAN_TEMPLATE_SHEET,
+                field="columnas",
+                expected=", ".join(required_headers),
+                actual_value=", ".join(sorted(headers.keys())) or "sin encabezados",
+            )
+        )
+
+    meal_col = headers.get("COMIDA")
+    seen_meals: set[str] = set()
+
+    for row_idx in range(2, ws.max_row + 1):
+        meal_value = ws.cell(row=row_idx, column=meal_col).value if meal_col else None
+        if value_is_missing(meal_value):
+            continue
+
+        meal_name = normalize_lookup_label(str(meal_value))
+        if meal_name not in distribution:
+            issues.append(
+                make_issue(
+                    section=SECTION_PLAN,
+                    message="La comida indicada no es valida.",
+                    sheet=PLAN_TEMPLATE_SHEET,
+                    location=f"A{row_idx}",
+                    field="COMIDA",
+                    expected=", ".join(meal_def["name"] for meal_def in MEAL_DEFS),
+                    actual_value=format_actual_value(meal_value),
+                )
+            )
+            continue
+
+        if meal_name in seen_meals:
+            issues.append(
+                make_issue(
+                    section=SECTION_PLAN,
+                    message=f"La comida {meal_name} esta repetida.",
+                    sheet=PLAN_TEMPLATE_SHEET,
+                    location=f"A{row_idx}",
+                    field="COMIDA",
+                    actual_value=meal_name,
+                )
+            )
+            continue
+
+        for header_name, group_code in EXAMPLE_GROUP_HEADERS.items():
+            col_idx = headers.get(header_name)
+            if col_idx is None:
+                continue
+            cell = ws.cell(row=row_idx, column=col_idx)
+            distribution[meal_name][group_code] = parse_number_with_issue(
+                cell.value,
+                section=SECTION_PLAN,
+                sheet=PLAN_TEMPLATE_SHEET,
+                location=cell.coordinate,
+                field=header_name,
+                issues=issues,
+            )
+
+        seen_meals.add(meal_name)
+
+    return distribution
+
+
+def append_missing_label_issue(
+    issues: List[ValidationIssue],
+    *,
+    section: str,
+    sheet: str,
+    label_type: str,
+    missing_labels: List[str],
+) -> None:
+    if not missing_labels:
+        return
+    issues.append(
+        make_issue(
+            section=section,
+            message=f"Faltan etiquetas obligatorias en {label_type}.",
+            sheet=sheet,
+            field=label_type,
+            expected=", ".join(missing_labels),
+            actual_value="faltantes",
+        )
+    )
+
+
+def build_label_lookup_first(
+    rows: List[Tuple[str, object]]
+) -> Dict[str, object]:
+    lookup: Dict[str, object] = {}
+    for label, value in rows:
+        normalized = normalize_lookup_label(label)
+        if normalized and normalized not in lookup:
+            lookup[normalized] = value
+    return lookup
+
+
+def inspect_anthro_data(
+    wb,
+    patient: PatientInfo,
+    issues: List[ValidationIssue],
+) -> AnthropometricReportData:
+    anthro_data = blank_anthro_data(patient)
+    if ANTHRO_TEMPLATE_SHEET not in wb.sheetnames:
+        issues.append(
+            make_issue(
+                section=SECTION_ANTHRO,
+                message=f"Falta la hoja obligatoria {ANTHRO_TEMPLATE_SHEET}.",
+                sheet=ANTHRO_TEMPLATE_SHEET,
+                expected="Hoja con columnas SECCION, ETIQUETA, VALOR",
+            )
+        )
+        return anthro_data
+
+    ws = wb[ANTHRO_TEMPLATE_SHEET]
+    headers = build_sheet_headers(ws)
+    required_headers = ["SECCION", "ETIQUETA", "VALOR"]
+    missing_headers = [
+        header for header in required_headers if header not in headers]
+    if missing_headers:
+        issues.append(
+            make_issue(
+                section=SECTION_ANTHRO,
+                message="Faltan columnas obligatorias en la hoja antropometrica.",
+                sheet=ANTHRO_TEMPLATE_SHEET,
+                field="columnas",
+                expected=", ".join(required_headers),
+                actual_value=", ".join(sorted(headers.keys())) or "sin encabezados",
+            )
+        )
+
+    section_col = headers.get("SECCION")
+    label_col = headers.get("ETIQUETA")
+    value_col = headers.get("VALOR")
+    summary_rows_raw: List[Tuple[str, object]] = []
+    measurement_rows_raw: List[Tuple[str, object]] = []
+
+    for row_idx in range(2, ws.max_row + 1):
+        section_value = ws.cell(row=row_idx, column=section_col).value if section_col else None
+        label_value = ws.cell(row=row_idx, column=label_col).value if label_col else None
+        value = ws.cell(row=row_idx, column=value_col).value if value_col else None
+
+        if value_is_missing(section_value) and value_is_missing(label_value):
+            continue
+
+        if value_is_missing(section_value):
+            issues.append(
+                make_issue(
+                    section=SECTION_ANTHRO,
+                    message="La fila antropometrica no indica la seccion.",
+                    sheet=ANTHRO_TEMPLATE_SHEET,
+                    location=f"A{row_idx}",
+                    field="SECCION",
+                    expected="RESUMEN o MEDIDAS",
+                    actual_value="vacio",
+                )
+            )
+            continue
+
+        if value_is_missing(label_value):
+            issues.append(
+                make_issue(
+                    section=SECTION_ANTHRO,
+                    message="La fila antropometrica no indica la etiqueta.",
+                    sheet=ANTHRO_TEMPLATE_SHEET,
+                    location=f"B{row_idx}",
+                    field="ETIQUETA",
+                    expected="nombre de la medida",
+                    actual_value="vacio",
+                )
+            )
+            continue
+
+        section_name = normalize_lookup_label(str(section_value))
+        row = (str(label_value).strip(), value)
+        if section_name == "RESUMEN":
+            summary_rows_raw.append(row)
+        elif section_name in {"MEDIDAS", "MEDIDA"}:
+            measurement_rows_raw.append(row)
+        else:
+            issues.append(
+                make_issue(
+                    section=SECTION_ANTHRO,
+                    message="La seccion de la fila antropometrica no es valida.",
+                    sheet=ANTHRO_TEMPLATE_SHEET,
+                    location=f"A{row_idx}",
+                    field="SECCION",
+                    expected="RESUMEN o MEDIDAS",
+                    actual_value=format_actual_value(section_value),
+                )
+            )
+
+    summary_lookup = build_label_lookup_first(summary_rows_raw)
+    measurement_lookup = build_label_lookup_first(measurement_rows_raw)
+    missing_summary_labels = [
+        label
+        for label in ANTHRO_REQUIRED_SUMMARY_LABELS
+        if normalize_lookup_label(label) not in summary_lookup
+    ]
+    missing_measurement_labels = [
+        label
+        for label in ANTHRO_REQUIRED_MEASUREMENT_LABELS
+        if normalize_lookup_label(label) not in measurement_lookup
+    ]
+    append_missing_label_issue(
+        issues,
+        section=SECTION_ANTHRO,
+        sheet=ANTHRO_TEMPLATE_SHEET,
+        label_type="RESUMEN",
+        missing_labels=missing_summary_labels,
+    )
+    append_missing_label_issue(
+        issues,
+        section=SECTION_ANTHRO,
+        sheet=ANTHRO_TEMPLATE_SHEET,
+        label_type="MEDIDAS",
+        missing_labels=missing_measurement_labels,
+    )
+
+    anthro_data = AnthropometricReportData(
+        patient=patient,
+        peso_corporal_kg=format_decimal(
+            value_from_lookup(summary_lookup, ["Peso (Kg)", "Peso actual (kg)"]) or ""
+        ),
+        estatura_m=format_decimal(
+            value_from_lookup(measurement_lookup, ["Talla (m)"]) or ""
+        ),
+        masa_grasa_kg=format_decimal(
+            value_from_lookup(summary_lookup, ["Kg de Grasa"]) or ""
+        ),
+        pct_grasa_carter=format_decimal(
+            value_from_lookup(summary_lookup, ["% Grasa (Carter 1986)"]) or ""
+        ),
+        table_resumen=[
+            [format_table_value(label), format_table_value(value)]
+            for label, value in summary_rows_raw
+        ],
+        table_medidas=[
+            [format_table_value(label), format_table_value(value)]
+            for label, value in measurement_rows_raw
+        ],
+    )
+
+    if not anthro_data.peso_corporal_kg:
+        issues.append(
+            make_issue(
+                section=SECTION_ANTHRO,
+                message="No se pudo leer el peso corporal del resumen antropometrico.",
+                sheet=ANTHRO_TEMPLATE_SHEET,
+                field="Peso (Kg)",
+                expected="valor numerico",
+            )
+        )
+    if not anthro_data.estatura_m:
+        issues.append(
+            make_issue(
+                section=SECTION_ANTHRO,
+                message="No se pudo leer la talla en metros.",
+                sheet=ANTHRO_TEMPLATE_SHEET,
+                field="Talla (m)",
+                expected="valor numerico",
+            )
+        )
+    if not anthro_data.masa_grasa_kg:
+        issues.append(
+            make_issue(
+                section=SECTION_ANTHRO,
+                message="No se pudo leer Kg de Grasa.",
+                sheet=ANTHRO_TEMPLATE_SHEET,
+                field="Kg de Grasa",
+                expected="valor numerico",
+            )
+        )
+    if not anthro_data.pct_grasa_carter:
+        issues.append(
+            make_issue(
+                section=SECTION_ANTHRO,
+                message="No se pudo leer % Grasa (Carter 1986).",
+                sheet=ANTHRO_TEMPLATE_SHEET,
+                field="% Grasa (Carter 1986)",
+                expected="valor numerico",
+            )
+        )
+
+    return anthro_data
+
+
+def inspect_meal_examples(
+    wb,
+    meal_distribution: Dict[str, Dict[str, float]],
+    issues: List[ValidationIssue],
+) -> tuple[Dict[str, str], str]:
+    if "EJEMPLOS_COMIDAS" not in wb.sheetnames:
+        return {}, "no cargados"
+
+    try:
+        return build_meal_example_texts(wb, meal_distribution), "cargados"
+    except ValidationError as exc:
+        issues.append(
+            make_issue(
+                section=SECTION_EXAMPLES,
+                message="No se pudieron leer los ejemplos de comidas.",
+                sheet="EJEMPLOS_COMIDAS",
+                expected="Hoja opcional bien formada",
+                actual_value=str(exc),
+            )
+        )
+        return {}, "con errores"
+
+
+def inspect_workbook(wb) -> ParsedWorkbookData:
+    issues: List[ValidationIssue] = []
+    patient = inspect_patient_info(wb, issues)
+    meal_distribution = inspect_plan_distribution(wb, issues)
+    meal_totals = calculate_meal_totals(meal_distribution)
+    anthro_data = inspect_anthro_data(wb, patient, issues)
+    meal_examples, examples_status = inspect_meal_examples(
+        wb, meal_distribution, issues
+    )
+    anthro_data.patient = patient
+    return ParsedWorkbookData(
+        patient=patient,
+        meal_distribution=meal_distribution,
+        meal_totals=meal_totals,
+        anthro_data=anthro_data,
+        meal_examples=meal_examples,
+        issues=issues,
+        examples_status=examples_status,
+    )
+
+
+def format_validation_summary(issues: List[ValidationIssue]) -> str:
+    blocking_count = sum(1 for issue in issues if issue.is_blocking)
+    if blocking_count == 0:
+        return "El Excel se valido correctamente."
+    if blocking_count == 1:
+        return "No se puede generar: se encontro 1 error en el Excel."
+    return f"No se puede generar: se encontraron {blocking_count} errores en el Excel."
+
+
+def build_issue_detail(issue: ValidationIssue) -> str:
+    parts: List[str] = []
+    if issue.sheet:
+        parts.append(f"Hoja: {issue.sheet}")
+    if issue.location:
+        parts.append(f"Ubicacion: {issue.location}")
+    if issue.field:
+        parts.append(f"Campo: {issue.field}")
+    if issue.expected:
+        parts.append(f"Esperado: {issue.expected}")
+    if issue.actual_value:
+        parts.append(f"Encontrado: {issue.actual_value}")
+    return " | ".join(parts)
+
+
+def ordered_issues(issues: List[ValidationIssue]) -> List[ValidationIssue]:
+    section_index = {
+        section: idx for idx, section in enumerate(SECTION_ORDER)
+    }
+    unique: dict[tuple[str, str, str, str, str, str, str], ValidationIssue] = {}
+    for issue in issues:
+        key = (
+            issue.section,
+            issue.message,
+            issue.sheet,
+            issue.location,
+            issue.field,
+            issue.expected,
+            issue.actual_value,
+        )
+        unique.setdefault(key, issue)
+    return sorted(
+        unique.values(),
+        key=lambda issue: (
+            section_index.get(issue.section, len(section_index)),
+            issue.sheet,
+            issue.location,
+            issue.message,
+        ),
+    )
+
+
+def format_validation_report(issues: List[ValidationIssue]) -> str:
+    ordered = ordered_issues(issues)
+    if not ordered:
+        return "Sin errores detectados."
+
+    lines: List[str] = []
+    current_section = ""
+    counter = 1
+    for issue in ordered:
+        if issue.section != current_section:
+            if lines:
+                lines.append("")
+            current_section = issue.section
+            lines.append(current_section)
+        lines.append(f"{counter}. {issue.message}")
+        detail = build_issue_detail(issue)
+        if detail:
+            lines.append(f"   {detail}")
+        counter += 1
+    return "\n".join(lines)
+
+
+def build_validation_error_message(issues: List[ValidationIssue]) -> str:
+    return format_validation_summary(issues) + "\n\n" + format_validation_report(issues)
+
+
+def format_preview_text(data: ParsedWorkbookData) -> str:
+    lines: List[str] = []
+    lines.append("Paciente")
+    lines.append(f"- Nombre: {data.patient.name or 'vacio'}")
+    lines.append(f"- Cedula: {data.patient.ci or 'vacio'}")
+    lines.append(f"- Sexo: {data.patient.sex or 'vacio'}")
+    lines.append(f"- Edad: {data.patient.age or 'vacio'}")
+    lines.append(f"- Disciplina: {data.patient.discipline or 'vacio'}")
+
+    lines.append("")
+    lines.append("Plan leido")
+    for meal_def in MEAL_DEFS:
+        meal_name = meal_def["name"]
+        values = data.meal_distribution.get(meal_name, {})
+        rendered = ", ".join(
+            f"{GROUP_NAMES[group]}={format_quantity(values.get(group, 0.0))}"
+            for group in GROUP_ROWS
+        )
+        lines.append(f"- {meal_name}: {rendered}")
+
+    lines.append("")
+    lines.append("Totales del dia")
+    lines.append(
+        "- "
+        + ", ".join(
+            f"{GROUP_NAMES[group]}={format_quantity(data.meal_totals.get(group, 0.0))}"
+            for group in GROUP_ROWS
+        )
+    )
+
+    lines.append("")
+    lines.append("Antropometria leida")
+    lines.append(f"- Peso: {data.anthro_data.peso_corporal_kg or 'vacio'}")
+    lines.append(f"- Talla: {data.anthro_data.estatura_m or 'vacio'}")
+    lines.append(f"- Kg grasa: {data.anthro_data.masa_grasa_kg or 'vacio'}")
+    lines.append(f"- % grasa Carter: {data.anthro_data.pct_grasa_carter or 'vacio'}")
+
+    lines.append("")
+    lines.append("Resumen antropometrico")
+    if data.anthro_data.table_resumen:
+        for label, value in data.anthro_data.table_resumen:
+            lines.append(f"- {label}: {value or 'vacio'}")
+    else:
+        lines.append("- Sin filas leidas")
+
+    lines.append("")
+    lines.append("Medidas antropometricas")
+    if data.anthro_data.table_medidas:
+        for label, value in data.anthro_data.table_medidas:
+            lines.append(f"- {label}: {value or 'vacio'}")
+    else:
+        lines.append("- Sin filas leidas")
+
+    lines.append("")
+    lines.append(f"Ejemplos: {data.examples_status}")
+    if data.meal_examples:
+        for meal_name in sorted(data.meal_examples):
+            lines.append(f"- {meal_name}: {data.meal_examples[meal_name]}")
+
+    lines.append("")
+    lines.append("Errores detectados")
+    if data.issues:
+        lines.append(format_validation_report(data.issues))
+    else:
+        lines.append("Sin errores bloqueantes.")
+
+    return "\n".join(lines)

@@ -9,13 +9,13 @@ from pptx import Presentation
 
 from excel_helpers import (
     MEAL_DEFS,
+    ParsedWorkbookData,
     ValidationError,
-    build_meal_example_texts,
+    build_validation_error_message,
     build_meal_replacements,
     build_replacements,
     build_totals_replacements,
-    load_meal_distribution,
-    load_patient_info,
+    inspect_workbook,
 )
 from pptx_helpers import (
     align_marked_shapes,
@@ -60,6 +60,7 @@ def generate_plan_pptx(
     excel_path: Path | str,
     template_path: Path | str = DEFAULT_TEMPLATE_PATH,
     output_path: Path | str = DEFAULT_OUTPUT_PATH,
+    parsed_data: ParsedWorkbookData | None = None,
 ) -> Path:
     excel_path = Path(excel_path)
     template_path = Path(template_path)
@@ -71,13 +72,18 @@ def generate_plan_pptx(
     if not template_path.exists():
         raise FileNotFoundError(f"No existe el PPTX base: {template_path}")
 
-    wb = load_workbook(excel_path, data_only=True)
-    patient = load_patient_info(wb)
-    meal_distribution = load_meal_distribution(wb)
+    if parsed_data is None:
+        wb = load_workbook(excel_path, data_only=True)
+        parsed_data = inspect_workbook(wb)
+    if parsed_data.has_blocking_issues:
+        raise ValidationError(build_validation_error_message(parsed_data.issues))
+
+    patient = parsed_data.patient
+    meal_distribution = parsed_data.meal_distribution
 
     replacements = build_replacements(patient)
     replacements.update(build_totals_replacements(meal_distribution))
-    meal_example_texts = build_meal_example_texts(wb, meal_distribution)
+    meal_example_texts = parsed_data.meal_examples
 
     presentation = Presentation(str(template_path))
     slides_to_remove: List[int] = []

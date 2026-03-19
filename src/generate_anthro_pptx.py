@@ -8,11 +8,13 @@ from openpyxl import load_workbook
 from pptx import Presentation
 
 from excel_helpers import (
+    ParsedWorkbookData,
     ValidationError,
+    build_validation_error_message,
     build_anthropometric_replacements,
     build_measurements_table_replacements,
     build_summary_table_replacements,
-    load_anthropometric_data,
+    inspect_workbook,
 )
 from pptx_helpers import replace_in_shape
 
@@ -61,6 +63,7 @@ def generate_anthro_pptx(
     template_path: Path | str = DEFAULT_TEMPLATE_PATH,
     output_path: Path | str = DEFAULT_OUTPUT_PATH,
     today: date | None = None,
+    parsed_data: ParsedWorkbookData | None = None,
 ) -> Path:
     excel_path = Path(excel_path)
     template_path = Path(template_path)
@@ -72,8 +75,12 @@ def generate_anthro_pptx(
     if not template_path.exists():
         raise FileNotFoundError(f"No existe el PPTX base: {template_path}")
 
-    wb = load_workbook(excel_path, data_only=True)
-    anthro_data = load_anthropometric_data(wb)
+    if parsed_data is None:
+        wb = load_workbook(excel_path, data_only=True)
+        parsed_data = inspect_workbook(wb)
+    if parsed_data.has_blocking_issues:
+        raise ValidationError(build_validation_error_message(parsed_data.issues))
+    anthro_data = parsed_data.anthro_data
 
     reference_date = today if today is not None else date.today()
     base_replacements = build_anthropometric_replacements(
