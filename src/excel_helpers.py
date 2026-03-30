@@ -722,6 +722,31 @@ def value_from_lookup(
     return None
 
 
+def lookup_contains_any_label(
+    lookup: Dict[str, object],
+    labels: List[str],
+) -> bool:
+    return any(normalize_lookup_label(label) in lookup for label in labels)
+
+
+ANTHRO_PESO_LABELS = [
+    "Peso (Kg)",
+    "Peso actual (kg)",
+    "Peso Actual (Kg)",
+]
+
+ANTHRO_TALLA_M_LABELS = ["Talla (m)"]
+
+ANTHRO_MASA_GRASA_LABELS = ["Kg de Grasa"]
+
+ANTHRO_PCT_GRASA_CARTER_LABELS = [
+    "% Grasa (Carter 1986)",
+    "% Grasa Carter",
+    "% Grasa Carter 1986",
+    "%grasa carter",
+]
+
+
 def anthropometric_data_from_rows(
     patient: PatientInfo,
     summary_rows_raw: List[Tuple[str, object]],
@@ -730,27 +755,28 @@ def anthropometric_data_from_rows(
     summary_lookup = build_label_lookup(summary_rows_raw)
     measurement_lookup = build_label_lookup(measurement_rows_raw)
 
-    peso_corporal_value = value_from_lookup(
-        summary_lookup, ["Peso (Kg)", "Peso actual (kg)"])
+    peso_corporal_value = value_from_lookup(summary_lookup, ANTHRO_PESO_LABELS)
     if value_is_missing(peso_corporal_value):
         raise ValidationError(
             "Falta campo: Peso corporal en la tabla resumen antropométrica"
         )
 
-    estatura_value = value_from_lookup(measurement_lookup, ["Talla (m)"])
+    estatura_value = value_from_lookup(
+        measurement_lookup, ANTHRO_TALLA_M_LABELS)
     if value_is_missing(estatura_value):
         raise ValidationError(
             "Falta campo: Talla (m) en la tabla de medidas antropométricas"
         )
 
-    masa_grasa_value = value_from_lookup(summary_lookup, ["Kg de Grasa"])
+    masa_grasa_value = value_from_lookup(
+        summary_lookup, ANTHRO_MASA_GRASA_LABELS)
     if value_is_missing(masa_grasa_value):
         raise ValidationError(
             "Falta campo: Kg de Grasa en la tabla resumen antropométrica"
         )
 
     pct_grasa_value = value_from_lookup(
-        summary_lookup, ["% Grasa (Carter 1986)"])
+        summary_lookup, ANTHRO_PCT_GRASA_CARTER_LABELS)
     if value_is_missing(pct_grasa_value):
         raise ValidationError(
             "Falta campo: % Grasa (Carter 1986) en la tabla resumen antropométrica"
@@ -1045,49 +1071,49 @@ SECTION_ORDER = [
     SECTION_EXAMPLES,
 ]
 
-ANTHRO_REQUIRED_SUMMARY_LABELS = [
-    "Evaluación",
-    "Fecha",
-    "Peso (Kg)",
-    "Talla parada (cm)",
-    "% Grasa (Carter 1986)",
-    "% Grasa (Durnin y W. 1974)",
-    "Interpretación",
-    "Kg de Masa Magra",
-    "Kg de Grasa",
-    "Masa Muscular (Kg)",
-    "Masa Adiposa (Kg)",
-    "Sumatoria de 6 pliegues",
-    "Somatotipo",
+ANTHRO_REQUIRED_SUMMARY_FIELDS = [
+    ("Evaluación", ["Evaluación"]),
+    ("Fecha", ["Fecha"]),
+    ("Peso (Kg)", ANTHRO_PESO_LABELS),
+    ("Talla parada (cm)", ["Talla parada (cm)"]),
+    ("% Grasa (Carter 1986)", ANTHRO_PCT_GRASA_CARTER_LABELS),
+    ("% Grasa (Durnin y W. 1974)", ["% Grasa (Durnin y W. 1974)"]),
+    ("Interpretación", ["Interpretación"]),
+    ("Kg de Masa Magra", ["Kg de Masa Magra"]),
+    ("Kg de Grasa", ANTHRO_MASA_GRASA_LABELS),
+    ("Masa Muscular (Kg)", ["Masa Muscular (Kg)"]),
+    ("Masa Adiposa (Kg)", ["Masa Adiposa (Kg)"]),
+    ("Sumatoria de 6 pliegues", ["Sumatoria de 6 pliegues"]),
+    ("Somatotipo", ["Somatotipo"]),
 ]
 
-ANTHRO_REQUIRED_MEASUREMENT_LABELS = [
-    "Fecha de evaluación",
-    "Peso actual (kg)",
-    "Talla (m)",
-    "Talla (cm)",
-    "Circunferencias(cm)",
-    "Brazo relajado (cm)",
-    "Brazo Flexionado en Tensión (cm)",
-    "Antebrazo máximo (cm)",
-    "Tórax (Mesoesternal) (cm)",
-    "Cintura mínimo (cm)",
-    "Cadera máximo (cm)",
-    "Muslo máximo (cm)",
-    "Muslo medial (cm)",
-    "Pantorrilla máximo (cm)",
-    "Pliegues (mm)",
-    "Bíceps (mm)",
-    "Tríceps (mm)",
-    "Subescapular (mm)",
-    "Ileo-crestal (mm)",
-    "Supra-espinal (mm)",
-    "Abdominal (mm)",
-    "Muslo frontal (mm)",
-    "Pantorrilla (mm)",
-    "Diametros óseos (cm)",
-    "Humeral (Biepicondilar)",
-    "Femoral (Biepicondilar)",
+ANTHRO_REQUIRED_MEASUREMENT_FIELDS = [
+    ("Fecha de evaluación", ["Fecha de evaluación"]),
+    ("Peso actual (kg)", ["Peso actual (kg)"]),
+    ("Talla (m)", ANTHRO_TALLA_M_LABELS),
+    ("Talla (cm)", ["Talla (cm)"]),
+    ("Circunferencias(cm)", ["Circunferencias(cm)"]),
+    ("Brazo relajado (cm)", ["Brazo relajado (cm)"]),
+    ("Brazo Flexionado en Tensión (cm)", ["Brazo Flexionado en Tensión (cm)"]),
+    ("Antebrazo máximo (cm)", ["Antebrazo máximo (cm)"]),
+    ("Tórax (Mesoesternal) (cm)", ["Tórax (Mesoesternal) (cm)"]),
+    ("Cintura mínimo (cm)", ["Cintura mínimo (cm)"]),
+    ("Cadera máximo (cm)", ["Cadera máximo (cm)"]),
+    ("Muslo máximo (cm)", ["Muslo máximo (cm)"]),
+    ("Muslo medial (cm)", ["Muslo medial (cm)"]),
+    ("Pantorrilla máximo (cm)", ["Pantorrilla máximo (cm)"]),
+    ("Pliegues (mm)", ["Pliegues (mm)"]),
+    ("Bíceps (mm)", ["Bíceps (mm)"]),
+    ("Tríceps (mm)", ["Tríceps (mm)"]),
+    ("Subescapular (mm)", ["Subescapular (mm)"]),
+    ("Ileo-crestal (mm)", ["Ileo-crestal (mm)"]),
+    ("Supra-espinal (mm)", ["Supra-espinal (mm)"]),
+    ("Abdominal (mm)", ["Abdominal (mm)"]),
+    ("Muslo frontal (mm)", ["Muslo frontal (mm)"]),
+    ("Pantorrilla (mm)", ["Pantorrilla (mm)"]),
+    ("Diametros óseos (cm)", ["Diametros óseos (cm)"]),
+    ("Humeral (Biepicondilar)", ["Humeral (Biepicondilar)"]),
+    ("Femoral (Biepicondilar)", ["Femoral (Biepicondilar)"]),
 ]
 
 
@@ -1254,7 +1280,8 @@ def inspect_plan_distribution(
                 sheet=PLAN_TEMPLATE_SHEET,
                 field="columnas",
                 expected=", ".join(required_headers),
-                actual_value=", ".join(sorted(headers.keys())) or "sin encabezados",
+                actual_value=", ".join(
+                    sorted(headers.keys())) or "sin encabezados",
             )
         )
 
@@ -1262,7 +1289,8 @@ def inspect_plan_distribution(
     seen_meals: set[str] = set()
 
     for row_idx in range(2, ws.max_row + 1):
-        meal_value = ws.cell(row=row_idx, column=meal_col).value if meal_col else None
+        meal_value = ws.cell(
+            row=row_idx, column=meal_col).value if meal_col else None
         if value_is_missing(meal_value):
             continue
 
@@ -1275,7 +1303,8 @@ def inspect_plan_distribution(
                     sheet=PLAN_TEMPLATE_SHEET,
                     location=f"A{row_idx}",
                     field="COMIDA",
-                    expected=", ".join(meal_def["name"] for meal_def in MEAL_DEFS),
+                    expected=", ".join(meal_def["name"]
+                                       for meal_def in MEAL_DEFS),
                     actual_value=format_actual_value(meal_value),
                 )
             )
@@ -1376,7 +1405,8 @@ def inspect_anthro_data(
                 sheet=ANTHRO_TEMPLATE_SHEET,
                 field="columnas",
                 expected=", ".join(required_headers),
-                actual_value=", ".join(sorted(headers.keys())) or "sin encabezados",
+                actual_value=", ".join(
+                    sorted(headers.keys())) or "sin encabezados",
             )
         )
 
@@ -1387,9 +1417,12 @@ def inspect_anthro_data(
     measurement_rows_raw: List[Tuple[str, object]] = []
 
     for row_idx in range(2, ws.max_row + 1):
-        section_value = ws.cell(row=row_idx, column=section_col).value if section_col else None
-        label_value = ws.cell(row=row_idx, column=label_col).value if label_col else None
-        value = ws.cell(row=row_idx, column=value_col).value if value_col else None
+        section_value = ws.cell(
+            row=row_idx, column=section_col).value if section_col else None
+        label_value = ws.cell(
+            row=row_idx, column=label_col).value if label_col else None
+        value = ws.cell(
+            row=row_idx, column=value_col).value if value_col else None
 
         if value_is_missing(section_value) and value_is_missing(label_value):
             continue
@@ -1444,14 +1477,14 @@ def inspect_anthro_data(
     summary_lookup = build_label_lookup_first(summary_rows_raw)
     measurement_lookup = build_label_lookup_first(measurement_rows_raw)
     missing_summary_labels = [
-        label
-        for label in ANTHRO_REQUIRED_SUMMARY_LABELS
-        if normalize_lookup_label(label) not in summary_lookup
+        field
+        for field, labels in ANTHRO_REQUIRED_SUMMARY_FIELDS
+        if not lookup_contains_any_label(summary_lookup, labels)
     ]
     missing_measurement_labels = [
-        label
-        for label in ANTHRO_REQUIRED_MEASUREMENT_LABELS
-        if normalize_lookup_label(label) not in measurement_lookup
+        field
+        for field, labels in ANTHRO_REQUIRED_MEASUREMENT_FIELDS
+        if not lookup_contains_any_label(measurement_lookup, labels)
     ]
     append_missing_label_issue(
         issues,
@@ -1471,16 +1504,17 @@ def inspect_anthro_data(
     anthro_data = AnthropometricReportData(
         patient=patient,
         peso_corporal_kg=format_decimal(
-            value_from_lookup(summary_lookup, ["Peso (Kg)", "Peso actual (kg)"]) or ""
+            value_from_lookup(summary_lookup, ANTHRO_PESO_LABELS) or ""
         ),
         estatura_m=format_decimal(
-            value_from_lookup(measurement_lookup, ["Talla (m)"]) or ""
+            value_from_lookup(measurement_lookup, ANTHRO_TALLA_M_LABELS) or ""
         ),
         masa_grasa_kg=format_decimal(
-            value_from_lookup(summary_lookup, ["Kg de Grasa"]) or ""
+            value_from_lookup(summary_lookup, ANTHRO_MASA_GRASA_LABELS) or ""
         ),
         pct_grasa_carter=format_decimal(
-            value_from_lookup(summary_lookup, ["% Grasa (Carter 1986)"]) or ""
+            value_from_lookup(
+                summary_lookup, ANTHRO_PCT_GRASA_CARTER_LABELS) or ""
         ),
         table_resumen=[
             [format_table_value(label), format_table_value(value)]
@@ -1608,7 +1642,8 @@ def ordered_issues(issues: List[ValidationIssue]) -> List[ValidationIssue]:
     section_index = {
         section: idx for idx, section in enumerate(SECTION_ORDER)
     }
-    unique: dict[tuple[str, str, str, str, str, str, str], ValidationIssue] = {}
+    unique: dict[tuple[str, str, str, str,
+                       str, str, str], ValidationIssue] = {}
     for issue in issues:
         key = (
             issue.section,
@@ -1692,7 +1727,8 @@ def format_preview_text(data: ParsedWorkbookData) -> str:
     lines.append(f"- Peso: {data.anthro_data.peso_corporal_kg or 'vacio'}")
     lines.append(f"- Talla: {data.anthro_data.estatura_m or 'vacio'}")
     lines.append(f"- Kg grasa: {data.anthro_data.masa_grasa_kg or 'vacio'}")
-    lines.append(f"- % grasa Carter: {data.anthro_data.pct_grasa_carter or 'vacio'}")
+    lines.append(
+        f"- % grasa Carter: {data.anthro_data.pct_grasa_carter or 'vacio'}")
 
     lines.append("")
     lines.append("Resumen antropometrico")
