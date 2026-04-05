@@ -4,18 +4,18 @@ import argparse
 from pathlib import Path
 from typing import Dict, List
 
-from openpyxl import load_workbook
 from pptx import Presentation
 
 from excel_helpers import (
     MEAL_DEFS,
     ParsedWorkbookData,
     ValidationError,
-    build_validation_error_message,
+    build_validation_warning_message,
     build_meal_replacements,
     build_replacements,
     build_totals_replacements,
     inspect_workbook,
+    load_workbook_for_inspection,
 )
 from pptx_helpers import (
     align_marked_shapes,
@@ -73,10 +73,11 @@ def generate_plan_pptx(
         raise FileNotFoundError(f"No existe el PPTX base: {template_path}")
 
     if parsed_data is None:
-        wb = load_workbook(excel_path, data_only=True)
-        parsed_data = inspect_workbook(wb)
-    if parsed_data.has_blocking_issues:
-        raise ValidationError(build_validation_error_message(parsed_data.issues))
+        wb = load_workbook_for_inspection(excel_path)
+        try:
+            parsed_data = inspect_workbook(wb)
+        finally:
+            wb.close()
 
     patient = parsed_data.patient
     meal_distribution = parsed_data.meal_distribution
@@ -96,9 +97,11 @@ def generate_plan_pptx(
             meal_distribution, meal_def
         )
         replacements.update(meal_repl)
-        if meal_def["name"] in meal_example_texts:
-            example_placeholder = "{{" + meal_def["name"] + "_EJEMPLO}}"
-            replacements[example_placeholder] = meal_example_texts[meal_def["name"]]
+        example_placeholder = "{{" + meal_def["name"] + "_EJEMPLO}}"
+        replacements[example_placeholder] = meal_example_texts.get(
+            meal_def["name"],
+            "",
+        )
         placeholder_values.update(meal_placeholder_values)
         meal_tokens_by_name[meal_def["name"]] = tokens
         if not include_meal:
@@ -128,9 +131,11 @@ def generate_plan_pptx(
             )
         align_marked_shapes(slide, placeholder_values, table_maps)
         apply_vertical_stack(slide)
-        if slide_meal_name and slide_meal_name in meal_example_texts:
+        if slide_meal_name:
             replace_meal_example_text(
-                slide, meal_example_texts[slide_meal_name])
+                slide,
+                meal_example_texts.get(slide_meal_name, ""),
+            )
 
     remove_slides_by_index(presentation, slides_to_remove)
 
@@ -141,15 +146,24 @@ def generate_plan_pptx(
 def main() -> int:
     args = parse_args()
     try:
+        wb = load_workbook_for_inspection(args.excel)
+        try:
+            parsed_data = inspect_workbook(wb)
+        finally:
+            wb.close()
         output_path = generate_plan_pptx(
             excel_path=args.excel,
             template_path=args.template,
             output_path=args.output,
+            parsed_data=parsed_data,
         )
     except (FileNotFoundError, ValidationError) as exc:
         print(f"Error: {exc}")
         return 1
     print(f"PPTX generado: {output_path}")
+    if parsed_data.issues:
+        print("")
+        print(build_validation_warning_message(parsed_data.issues))
     return 0
 
 

@@ -4,19 +4,17 @@ import argparse
 from datetime import date, datetime
 from pathlib import Path
 
-from openpyxl import load_workbook
 from pptx import Presentation
 
 from excel_helpers import (
     ParsedWorkbookData,
     ValidationError,
-    build_validation_error_message,
     build_anthropometric_replacements,
-    build_measurements_table_replacements,
-    build_summary_table_replacements,
+    build_validation_warning_message,
     inspect_workbook,
+    load_workbook_for_inspection,
 )
-from pptx_helpers import replace_in_shape
+from pptx_helpers import replace_in_shape, replace_table_shape_with_data
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -76,18 +74,16 @@ def generate_anthro_pptx(
         raise FileNotFoundError(f"No existe el PPTX base: {template_path}")
 
     if parsed_data is None:
-        wb = load_workbook(excel_path, data_only=True)
-        parsed_data = inspect_workbook(wb)
-    if parsed_data.has_blocking_issues:
-        raise ValidationError(build_validation_error_message(parsed_data.issues))
+        wb = load_workbook_for_inspection(excel_path)
+        try:
+            parsed_data = inspect_workbook(wb)
+        finally:
+            wb.close()
     anthro_data = parsed_data.anthro_data
 
     reference_date = today if today is not None else date.today()
     base_replacements = build_anthropometric_replacements(
         anthro_data, reference_date)
-    summary_table_replacements = build_summary_table_replacements(anthro_data)
-    measurement_table_replacements = build_measurements_table_replacements(
-        anthro_data)
 
     presentation = Presentation(str(template_path))
     if len(presentation.slides) < 4:
@@ -97,13 +93,23 @@ def generate_anthro_pptx(
 
     for slide_idx, slide in enumerate(presentation.slides):
         slide_replacements = dict(base_replacements)
-        if slide_idx == 2:
-            slide_replacements.update(summary_table_replacements)
-        elif slide_idx == 3:
-            slide_replacements.update(measurement_table_replacements)
 
         table_maps = []
         for shape in list(slide.shapes):
+            if slide_idx == 2 and shape.has_table:
+                replace_table_shape_with_data(
+                    slide,
+                    shape,
+                    anthro_data.table_resumen,
+                )
+                continue
+            if slide_idx == 3 and shape.has_table:
+                replace_table_shape_with_data(
+                    slide,
+                    shape,
+                    anthro_data.table_medidas,
+                )
+                continue
             replace_in_shape(
                 shape,
                 slide_replacements,
@@ -120,16 +126,25 @@ def generate_anthro_pptx(
 def main() -> int:
     args = parse_args()
     try:
+        wb = load_workbook_for_inspection(args.excel)
+        try:
+            parsed_data = inspect_workbook(wb)
+        finally:
+            wb.close()
         output_path = generate_anthro_pptx(
             excel_path=args.excel,
             template_path=args.template,
             output_path=args.output,
             today=args.today,
+            parsed_data=parsed_data,
         )
     except (FileNotFoundError, ValidationError) as exc:
         print(f"Error: {exc}")
         return 1
     print(f"PPTX antropometrico generado: {output_path}")
+    if parsed_data.issues:
+        print("")
+        print(build_validation_warning_message(parsed_data.issues))
     return 0
 
 

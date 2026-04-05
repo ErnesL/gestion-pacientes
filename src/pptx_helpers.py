@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
@@ -169,6 +170,232 @@ def remove_shape(shape) -> None:
     parent = element.getparent()
     if parent is not None:
         parent.remove(element)
+
+
+def copy_table_style(source_table, target_table) -> None:
+    source_tbl_pr = source_table._tbl.tblPr
+    target_tbl_pr = target_table._tbl.tblPr
+
+    for attr_name in list(target_tbl_pr.attrib):
+        del target_tbl_pr.attrib[attr_name]
+    for attr_name, attr_value in source_tbl_pr.attrib.items():
+        target_tbl_pr.set(attr_name, attr_value)
+
+    for child in list(target_tbl_pr):
+        target_tbl_pr.remove(child)
+    for child in source_tbl_pr:
+        target_tbl_pr.append(deepcopy(child))
+
+
+def compute_dynamic_table_col_widths(source_table, target_col_count: int, total_width: int) -> List[int]:
+    source_widths = [col.width for col in source_table.columns]
+    if target_col_count <= len(source_widths):
+        widths = source_widths[:target_col_count]
+        if widths:
+            widths[-1] += total_width - sum(widths)
+        return widths
+
+    label_width = source_widths[0] if source_widths else int(total_width / target_col_count)
+    label_width = min(label_width, int(total_width * 0.4))
+    label_width = max(label_width, int(total_width * 0.28))
+
+    value_col_count = max(target_col_count - 1, 1)
+    remaining_width = max(total_width - label_width, value_col_count)
+    value_width = int(remaining_width / value_col_count)
+    widths = [label_width] + [value_width] * value_col_count
+    widths[-1] += total_width - sum(widths)
+    return widths
+
+
+def compute_dynamic_table_row_heights(source_table, target_row_count: int, total_height: int) -> List[int]:
+    source_heights = [row.height for row in source_table.rows]
+    if not source_heights:
+        height = int(total_height / max(target_row_count, 1))
+        return [height] * target_row_count
+
+    if target_row_count <= len(source_heights):
+        return source_heights[:target_row_count]
+
+    heights = source_heights + [source_heights[-1]] * (target_row_count - len(source_heights))
+    current_total = sum(heights)
+    if current_total <= total_height:
+        heights[-1] += total_height - current_total
+        return heights
+
+    scale = total_height / current_total
+    scaled_heights = [max(1, int(height * scale)) for height in heights]
+    scaled_heights[-1] += total_height - sum(scaled_heights)
+    return scaled_heights
+
+
+def copy_paragraph_style(source_paragraph, target_paragraph) -> None:
+    target_paragraph.alignment = source_paragraph.alignment
+    target_paragraph.level = source_paragraph.level
+    source_p = source_paragraph._p
+    target_p = target_paragraph._p
+
+    def replace_child(child_name: str) -> None:
+        existing = next(
+            (child for child in target_p if child.tag.rsplit("}", 1)[-1] == child_name),
+            None,
+        )
+        if existing is not None:
+            target_p.remove(existing)
+        source_child = next(
+            (child for child in source_p if child.tag.rsplit("}", 1)[-1] == child_name),
+            None,
+        )
+        if source_child is None:
+            return
+        if child_name == "pPr":
+            target_p.insert(0, deepcopy(source_child))
+        else:
+            target_p.append(deepcopy(source_child))
+
+    replace_child("pPr")
+    replace_child("endParaRPr")
+
+
+def copy_run_style(source_run, target_run) -> None:
+    source_r = source_run._r
+    target_r = target_run._r
+    existing = next(
+        (child for child in target_r if child.tag.rsplit("}", 1)[-1] == "rPr"),
+        None,
+    )
+    if existing is not None:
+        target_r.remove(existing)
+    source_rpr = next(
+        (child for child in source_r if child.tag.rsplit("}", 1)[-1] == "rPr"),
+        None,
+    )
+    if source_rpr is not None:
+        target_r.insert(0, deepcopy(source_rpr))
+
+    source_font = source_run.font
+    target_font = target_run.font
+
+    if source_font.name is not None:
+        target_font.name = source_font.name
+    if source_font.size is not None:
+        target_font.size = source_font.size
+    if source_font.bold is not None:
+        target_font.bold = source_font.bold
+    if source_font.italic is not None:
+        target_font.italic = source_font.italic
+    if source_font.underline is not None:
+        target_font.underline = source_font.underline
+
+    try:
+        if source_font.color.rgb is not None:
+            target_font.color.rgb = source_font.color.rgb
+    except Exception:
+        pass
+
+
+def set_table_cell_text_from_sample(target_cell, text: str, sample_cell) -> None:
+    target_cell.text = text
+    target_cell.margin_left = sample_cell.margin_left
+    target_cell.margin_right = sample_cell.margin_right
+    target_cell.margin_top = sample_cell.margin_top
+    target_cell.margin_bottom = sample_cell.margin_bottom
+    target_cell.vertical_anchor = sample_cell.vertical_anchor
+
+    target_text_frame = target_cell.text_frame
+    source_text_frame = sample_cell.text_frame
+    target_text_frame.word_wrap = source_text_frame.word_wrap
+
+    if not source_text_frame.paragraphs or not target_text_frame.paragraphs:
+        return
+
+    source_paragraph = source_text_frame.paragraphs[0]
+    target_paragraph = target_text_frame.paragraphs[0]
+    copy_paragraph_style(source_paragraph, target_paragraph)
+
+    if not source_paragraph.runs:
+        return
+
+    if target_paragraph.runs:
+        target_run = target_paragraph.runs[0]
+        target_run.text = text
+        for extra_run in target_paragraph.runs[1:]:
+            extra_run.text = ""
+    else:
+        target_run = target_paragraph.add_run()
+        target_run.text = text
+
+    copy_run_style(source_paragraph.runs[0], target_run)
+
+
+def cell_has_styled_run(cell) -> bool:
+    paragraphs = cell.text_frame.paragraphs
+    return bool(paragraphs and paragraphs[0].runs)
+
+
+def resolve_table_sample_cell(source_table, row_idx: int, col_idx: int):
+    sample_row_idx = min(row_idx, len(source_table.rows) - 1)
+    sample_col_idx = 0 if col_idx == 0 else min(1, len(source_table.columns) - 1)
+    sample_cell = source_table.cell(sample_row_idx, sample_col_idx)
+    if cell_has_styled_run(sample_cell):
+        return sample_cell
+
+    if sample_col_idx > 0:
+        fallback_row_idx = 0 if row_idx == 0 else min(1, len(source_table.rows) - 1)
+        fallback_cell = source_table.cell(fallback_row_idx, sample_col_idx)
+        if cell_has_styled_run(fallback_cell):
+            return fallback_cell
+
+    for fallback_row_idx in range(len(source_table.rows)):
+        fallback_cell = source_table.cell(fallback_row_idx, sample_col_idx)
+        if cell_has_styled_run(fallback_cell):
+            return fallback_cell
+
+    return sample_cell
+
+
+def replace_table_shape_with_data(slide, shape, data_rows: List[List[str]]) -> object:
+    if not data_rows:
+        remove_shape(shape)
+        return None
+
+    row_count = len(data_rows)
+    col_count = max(len(row) for row in data_rows)
+    source_table = shape.table
+
+    new_shape = slide.shapes.add_table(
+        row_count,
+        col_count,
+        shape.left,
+        shape.top,
+        shape.width,
+        shape.height,
+    )
+    target_table = new_shape.table
+    copy_table_style(source_table, target_table)
+
+    col_widths = compute_dynamic_table_col_widths(source_table, col_count, shape.width)
+    for idx, width in enumerate(col_widths):
+        target_table.columns[idx].width = width
+
+    row_heights = compute_dynamic_table_row_heights(source_table, row_count, shape.height)
+    for idx, height in enumerate(row_heights):
+        target_table.rows[idx].height = height
+    rendered_height = sum(row_heights)
+    if rendered_height < shape.height:
+        new_shape.height = rendered_height
+
+    for row_idx in range(row_count):
+        for col_idx in range(col_count):
+            sample_cell = resolve_table_sample_cell(source_table, row_idx, col_idx)
+            value = data_rows[row_idx][col_idx] if col_idx < len(data_rows[row_idx]) else ""
+            set_table_cell_text_from_sample(
+                target_table.cell(row_idx, col_idx),
+                value,
+                sample_cell,
+            )
+
+    remove_shape(shape)
+    return new_shape
 
 
 def remove_table_columns(table, col_indices: List[int]) -> None:

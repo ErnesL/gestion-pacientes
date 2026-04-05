@@ -10,7 +10,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from app_support import GenerationResult, generate_all_documents, inspect_excel_file
-from excel_helpers import build_validation_error_message, format_preview_text
+from excel_helpers import format_preview_text
 
 
 @dataclass
@@ -225,14 +225,6 @@ class GestionPacientesApp:
                     text=format_preview_text(inspection),
                 )
             )
-            if inspection.has_blocking_issues:
-                self.queue.put(
-                    WorkerMessage(
-                        kind="error",
-                        text=build_validation_error_message(inspection.issues),
-                    )
-                )
-                return
 
             result = generate_all_documents(
                 excel_path=excel_path,
@@ -285,7 +277,6 @@ class GestionPacientesApp:
 
     def _render_result(self, result: GenerationResult) -> None:
         success_lines: list[str] = []
-        warning_lines: list[str] = []
 
         if result.preview_text:
             self._set_preview(result.preview_text)
@@ -297,7 +288,7 @@ class GestionPacientesApp:
             if document.pdf_path is not None:
                 success_lines.append(
                     f"{document.label} PDF: {document.pdf_path}")
-            warning_lines.extend(document.errors)
+        warning_lines = result.warnings
 
         if success_lines:
             self._append_log("Archivos generados:")

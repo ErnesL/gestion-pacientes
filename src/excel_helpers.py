@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import ast
 from datetime import date, datetime, timedelta
 from dataclasses import dataclass
+from pathlib import Path
+import re
 from typing import Dict, List, Tuple
+
+from openpyxl import load_workbook
 
 
 @dataclass
@@ -96,6 +101,29 @@ MEAL_EXAMPLE_ORDER = {
     "MTP": ["P", "A", "L", "F", "G", "V"],
     "CEN": ["P", "A", "V", "G", "F", "L"],
 }
+
+EXAMPLE_GUIDE_VALUES = {
+    "ej: lacteo",
+    "ej: vegetal",
+    "ej: fruta",
+    "ej: almidon",
+    "ej: proteina",
+    "ej: grasa",
+}
+EXAMPLE_GUIDE_OBSERVATION = "guia: reemplazar"
+INSPECTION_SHEETS = {
+    "HISTORIA",
+    PLAN_TEMPLATE_SHEET,
+    ANTHRO_TEMPLATE_SHEET,
+    "EJEMPLOS_COMIDAS",
+    "EQUIVALENCIAS_EJEMPLOS",
+}
+FORMULA_EXACT_REFERENCE_PATTERN = re.compile(
+    r"^\s*(?:(?P<sheet>'(?:[^']|'')+'|[A-Za-z0-9_ .ÁÉÍÓÚÜÑ()\-]+)!)?(?P<coord>\$?[A-Z]{1,3}\$?\d+)\s*$"
+)
+FORMULA_CELL_REFERENCE_PATTERN = re.compile(
+    r"(?:(?P<sheet>'(?:[^']|'')+'|[A-Za-z0-9_ .ÁÉÍÓÚÜÑ()\-]+)!)?(?P<coord>\$?[A-Z]{1,3}\$?\d+)"
+)
 
 DEFAULT_EXAMPLE_FOOD_DEFS = {
     "PAN": ExampleFood(
@@ -442,6 +470,171 @@ def normalize_lookup_label(value: str) -> str:
     return " ".join(normalized.split())
 
 
+@dataclass
+class WorkbookFormulaResolver:
+    value_wb: object
+    formula_wb: object
+    cache: Dict[tuple[str, str], object]
+
+    def __init__(self, value_wb, formula_wb) -> None:
+        self.value_wb = value_wb
+        self.formula_wb = formula_wb
+        self.cache = {}
+
+    def resolve_coordinate(
+        self,
+        sheet_name: str,
+        coord: str,
+        *,
+        visited: set[tuple[str, str]] | None = None,
+    ) -> object:
+        normalized_coord = coord.replace("$", "")
+        cache_key = (sheet_name, normalized_coord)
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        if visited is None:
+            visited = set()
+        if cache_key in visited:
+            return None
+        visited = set(visited)
+        visited.add(cache_key)
+
+        value_ws = self.value_wb[sheet_name] if sheet_name in self.value_wb.sheetnames else None
+        raw_ws = self.formula_wb[sheet_name] if sheet_name in self.formula_wb.sheetnames else None
+        if value_ws is not None:
+            cached_value = value_ws[normalized_coord].value
+            if not value_is_missing(cached_value):
+                self.cache[cache_key] = cached_value
+                return cached_value
+        if raw_ws is None:
+            self.cache[cache_key] = None
+            return None
+
+        raw_value = raw_ws[normalized_coord].value
+        if value_is_missing(raw_value):
+            self.cache[cache_key] = None
+            return None
+        if not (isinstance(raw_value, str) and raw_value.startswith("=")):
+            self.cache[cache_key] = raw_value
+            return raw_value
+
+        resolved_value = self._evaluate_formula(
+            raw_value[1:],
+            current_sheet_name=sheet_name,
+            visited=visited,
+        )
+        self.cache[cache_key] = resolved_value
+        return resolved_value
+
+    def _evaluate_formula(
+        self,
+        expression: str,
+        *,
+        current_sheet_name: str,
+        visited: set[tuple[str, str]],
+    ) -> object:
+        exact_match = FORMULA_EXACT_REFERENCE_PATTERN.fullmatch(expression.strip())
+        if exact_match:
+            target_sheet = self._normalize_formula_sheet_name(
+                exact_match.group("sheet"),
+                default_sheet=current_sheet_name,
+            )
+            return self.resolve_coordinate(
+                target_sheet,
+                exact_match.group("coord"),
+                visited=visited,
+            )
+
+        def replace_reference(match: re.Match[str]) -> str:
+            target_sheet = self._normalize_formula_sheet_name(
+                match.group("sheet"),
+                default_sheet=current_sheet_name,
+            )
+            resolved = self.resolve_coordinate(
+                target_sheet,
+                match.group("coord"),
+                visited=visited,
+            )
+            parsed = parse_optional_number(resolved)
+            if parsed is None:
+                raise ValueError("Referencia no numerica")
+            return repr(parsed)
+
+        try:
+            python_expression = FORMULA_CELL_REFERENCE_PATTERN.sub(
+                replace_reference,
+                expression,
+            ).replace("^", "**")
+            node = ast.parse(python_expression, mode="eval")
+            if not self._is_safe_numeric_ast(node):
+                return None
+            return eval(compile(node, "<formula>", "eval"), {"__builtins__": {}}, {})
+        except Exception:
+            return None
+
+    def _normalize_formula_sheet_name(
+        self,
+        raw_sheet_name: str | None,
+        *,
+        default_sheet: str,
+    ) -> str:
+        if raw_sheet_name is None:
+            return default_sheet
+        if raw_sheet_name.startswith("'") and raw_sheet_name.endswith("'"):
+            return raw_sheet_name[1:-1].replace("''", "'")
+        return raw_sheet_name
+
+    def _is_safe_numeric_ast(self, node: ast.AST) -> bool:
+        if isinstance(node, ast.Expression):
+            return self._is_safe_numeric_ast(node.body)
+        if isinstance(node, ast.Constant):
+            return isinstance(node.value, (int, float))
+        if isinstance(node, ast.UnaryOp):
+            return isinstance(node.op, (ast.UAdd, ast.USub)) and self._is_safe_numeric_ast(node.operand)
+        if isinstance(node, ast.BinOp):
+            return (
+                isinstance(node.op, (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow))
+                and self._is_safe_numeric_ast(node.left)
+                and self._is_safe_numeric_ast(node.right)
+            )
+        return False
+
+
+def hydrate_formula_cells_for_inspection(value_wb, formula_wb) -> None:
+    resolver = WorkbookFormulaResolver(value_wb, formula_wb)
+    for sheet_name in INSPECTION_SHEETS:
+        if sheet_name not in formula_wb.sheetnames or sheet_name not in value_wb.sheetnames:
+            continue
+        formula_ws = formula_wb[sheet_name]
+        value_ws = value_wb[sheet_name]
+        for row in formula_ws.iter_rows():
+            for formula_cell in row:
+                raw_value = formula_cell.value
+                if not (isinstance(raw_value, str) and raw_value.startswith("=")):
+                    continue
+                value_cell = value_ws[formula_cell.coordinate]
+                if not value_is_missing(value_cell.value):
+                    continue
+                resolved_value = resolver.resolve_coordinate(
+                    sheet_name,
+                    formula_cell.coordinate,
+                )
+                if not value_is_missing(resolved_value):
+                    value_cell.value = resolved_value
+
+
+def load_workbook_for_inspection(excel_path: Path | str):
+    excel_path = Path(excel_path)
+    keep_vba = excel_path.suffix.lower() == ".xlsm"
+    value_wb = load_workbook(excel_path, data_only=True, keep_vba=keep_vba)
+    formula_wb = load_workbook(excel_path, data_only=False, keep_vba=keep_vba)
+    try:
+        hydrate_formula_cells_for_inspection(value_wb, formula_wb)
+    finally:
+        formula_wb.close()
+    return value_wb
+
+
 def build_sheet_headers(ws, header_row: int = 1) -> Dict[str, int]:
     headers: Dict[str, int] = {}
     for cell in ws[header_row]:
@@ -658,6 +851,22 @@ def load_examples_sheet(wb) -> Dict[str, Dict[str, str]]:
     return meal_rows
 
 
+def is_guide_example_row(row_data: Dict[str, str]) -> bool:
+    observation = normalize_lookup_label(row_data.get("OBSERVACION", ""))
+    if observation == normalize_lookup_label(EXAMPLE_GUIDE_OBSERVATION):
+        return True
+
+    meaningful_values = [
+        value.strip().lower()
+        for key, value in row_data.items()
+        if key != "OBSERVACION" and value.strip()
+    ]
+    return bool(meaningful_values) and all(
+        value in EXAMPLE_GUIDE_VALUES
+        for value in meaningful_values
+    )
+
+
 def load_plan_template_distribution(wb) -> Dict[str, Dict[str, float]]:
     ws = require_sheet(wb, PLAN_TEMPLATE_SHEET)
     headers = build_sheet_headers(ws)
@@ -717,8 +926,16 @@ def value_from_lookup(
 ) -> object | None:
     for label in labels:
         normalized = normalize_lookup_label(label)
-        if normalized in lookup and not value_is_missing(lookup[normalized]):
-            return lookup[normalized]
+        if normalized not in lookup:
+            continue
+        candidate = lookup[normalized]
+        if isinstance(candidate, (list, tuple)):
+            for item in reversed(candidate):
+                if not value_is_missing(item):
+                    return item
+            continue
+        if not value_is_missing(candidate):
+            return candidate
     return None
 
 
@@ -746,12 +963,191 @@ ANTHRO_PCT_GRASA_CARTER_LABELS = [
     "%grasa carter",
 ]
 
+ANTHRO_REQUIRED_VALUE_SUMMARY_FIELDS = [
+    ("Fecha", ["Fecha"], "date"),
+    ("Peso (Kg)", ANTHRO_PESO_LABELS, "positive_number"),
+    ("Talla parada (cm)", ["Talla parada (cm)"], "positive_number"),
+    ("% Grasa (Carter 1986)", ANTHRO_PCT_GRASA_CARTER_LABELS, "positive_number"),
+    ("Kg de Grasa", ANTHRO_MASA_GRASA_LABELS, "positive_number"),
+]
+
+ANTHRO_REQUIRED_VALUE_MEASUREMENT_FIELDS = [
+    ("Fecha de evaluación", ["Fecha de evaluación"], "date"),
+    ("Talla (m)", ANTHRO_TALLA_M_LABELS, "positive_number"),
+]
+
+
+def detect_anthro_value_columns(ws) -> List[int]:
+    last_value_col = 0
+    for col_idx in range(3, ws.max_column + 1):
+        if any(
+            not value_is_missing(ws.cell(row=row_idx, column=col_idx).value)
+            for row_idx in range(1, ws.max_row + 1)
+        ):
+            last_value_col = col_idx
+    if last_value_col == 0:
+        return []
+    return list(range(3, last_value_col + 1))
+
+
+def parse_optional_number(value) -> float | None:
+    if value_is_missing(value) or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip().replace(",", ".")
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def anthro_required_value_is_valid(value, expected_type: str) -> bool:
+    if expected_type == "date":
+        if isinstance(value, (datetime, date)):
+            return True
+        return isinstance(value, str) and bool(value.strip())
+    if expected_type == "positive_number":
+        parsed = parse_optional_number(value)
+        return parsed is not None and parsed > 0
+    return not value_is_missing(value)
+
+
+def value_list_from_lookup(
+    lookup: Dict[str, object],
+    labels: List[str],
+) -> List[object]:
+    for label in labels:
+        normalized = normalize_lookup_label(label)
+        if normalized not in lookup:
+            continue
+        candidate = lookup[normalized]
+        if isinstance(candidate, (list, tuple)):
+            return list(candidate)
+        return [candidate]
+    return []
+
+
+def filter_anthro_rows_by_indices(
+    rows: List[Tuple[str, List[object]]],
+    indices: List[int],
+) -> List[Tuple[str, List[object]]]:
+    return [
+        (
+            label,
+            [values[idx] if idx < len(values) else None for idx in indices],
+        )
+        for label, values in rows
+    ]
+
+
+def find_valid_anthro_column_indices(
+    summary_rows: List[Tuple[str, List[object]]],
+    measurement_rows: List[Tuple[str, List[object]]],
+) -> List[int]:
+    max_len = max(
+        [len(values) for _, values in summary_rows + measurement_rows],
+        default=0,
+    )
+    if max_len == 0:
+        return []
+
+    summary_lookup = build_label_lookup_first(summary_rows)
+    measurement_lookup = build_label_lookup_first(measurement_rows)
+    valid_indices: List[int] = []
+
+    for idx in range(max_len):
+        summary_ok = all(
+            idx < len(value_list_from_lookup(summary_lookup, labels))
+            and anthro_required_value_is_valid(
+                value_list_from_lookup(summary_lookup, labels)[idx],
+                expected_type,
+            )
+            for _, labels, expected_type in ANTHRO_REQUIRED_VALUE_SUMMARY_FIELDS
+        )
+        measurement_ok = all(
+            idx < len(value_list_from_lookup(measurement_lookup, labels))
+            and anthro_required_value_is_valid(
+                value_list_from_lookup(measurement_lookup, labels)[idx],
+                expected_type,
+            )
+            for _, labels, expected_type in ANTHRO_REQUIRED_VALUE_MEASUREMENT_FIELDS
+        )
+        if summary_ok and measurement_ok:
+            valid_indices.append(idx)
+
+    return valid_indices
+
+
+def sanitize_anthro_rows(
+    summary_rows: List[Tuple[str, List[object]]],
+    measurement_rows: List[Tuple[str, List[object]]],
+) -> Tuple[List[Tuple[str, List[object]]], List[Tuple[str, List[object]]]]:
+    summary_rows = normalize_anthro_rows(summary_rows)
+    measurement_rows = normalize_anthro_rows(measurement_rows)
+    valid_indices = find_valid_anthro_column_indices(
+        summary_rows,
+        measurement_rows,
+    )
+    if not valid_indices:
+        return summary_rows, measurement_rows
+    return (
+        filter_anthro_rows_by_indices(summary_rows, valid_indices),
+        filter_anthro_rows_by_indices(measurement_rows, valid_indices),
+    )
+
+
+def normalize_anthro_rows(
+    rows: List[Tuple[str, List[object]]],
+) -> List[Tuple[str, List[object]]]:
+    if not rows:
+        return []
+
+    max_len = max(len(values) for _, values in rows)
+    if max_len == 0:
+        return [(label, []) for label, _ in rows]
+
+    last_used_idx = 0
+    for idx in range(max_len):
+        if any(
+            idx < len(values) and not value_is_missing(values[idx])
+            for _, values in rows
+        ):
+            last_used_idx = idx + 1
+    if last_used_idx == 0:
+        last_used_idx = max_len
+
+    normalized_rows: List[Tuple[str, List[object]]] = []
+    for label, values in rows:
+        padded = list(values[:last_used_idx])
+        padded.extend([None] * (last_used_idx - len(padded)))
+        normalized_rows.append((label, padded))
+    return normalized_rows
+
+
+def build_display_anthro_rows(
+    rows: List[Tuple[str, List[object]]],
+) -> List[List[str]]:
+    return [
+        [
+            format_table_value(label),
+            *[format_table_value(value) for value in values],
+        ]
+        for label, values in rows
+    ]
+
 
 def anthropometric_data_from_rows(
     patient: PatientInfo,
-    summary_rows_raw: List[Tuple[str, object]],
-    measurement_rows_raw: List[Tuple[str, object]],
+    summary_rows_raw: List[Tuple[str, List[object]]],
+    measurement_rows_raw: List[Tuple[str, List[object]]],
 ) -> AnthropometricReportData:
+    summary_rows_raw, measurement_rows_raw = sanitize_anthro_rows(
+        summary_rows_raw,
+        measurement_rows_raw,
+    )
     summary_lookup = build_label_lookup(summary_rows_raw)
     measurement_lookup = build_label_lookup(measurement_rows_raw)
 
@@ -788,14 +1184,8 @@ def anthropometric_data_from_rows(
         estatura_m=format_decimal(estatura_value),
         masa_grasa_kg=format_decimal(masa_grasa_value),
         pct_grasa_carter=format_decimal(pct_grasa_value),
-        table_resumen=[
-            [format_table_value(label), format_table_value(value)]
-            for label, value in summary_rows_raw
-        ],
-        table_medidas=[
-            [format_table_value(label), format_table_value(value)]
-            for label, value in measurement_rows_raw
-        ],
+        table_resumen=build_display_anthro_rows(summary_rows_raw),
+        table_medidas=build_display_anthro_rows(measurement_rows_raw),
     )
 
 
@@ -805,7 +1195,7 @@ def load_anthropometric_template_data(
 ) -> AnthropometricReportData:
     ws = require_sheet(wb, ANTHRO_TEMPLATE_SHEET)
     headers = build_sheet_headers(ws)
-    required_headers = ["SECCION", "ETIQUETA", "VALOR"]
+    required_headers = ["SECCION", "ETIQUETA"]
     missing_headers = [
         header for header in required_headers if header not in headers]
     if missing_headers:
@@ -813,14 +1203,18 @@ def load_anthropometric_template_data(
             f"Faltan columnas en {ANTHRO_TEMPLATE_SHEET}: " +
             ", ".join(missing_headers)
         )
+    value_columns = detect_anthro_value_columns(ws)
+    if not value_columns:
+        raise ValidationError(
+            f"La hoja {ANTHRO_TEMPLATE_SHEET} debe incluir al menos una columna de valores desde la columna C"
+        )
 
-    summary_rows_raw: List[Tuple[str, object]] = []
-    measurement_rows_raw: List[Tuple[str, object]] = []
+    summary_rows_raw: List[Tuple[str, List[object]]] = []
+    measurement_rows_raw: List[Tuple[str, List[object]]] = []
 
     for row_idx in range(2, ws.max_row + 1):
         section_value = ws.cell(row=row_idx, column=headers["SECCION"]).value
         label_value = ws.cell(row=row_idx, column=headers["ETIQUETA"]).value
-        value = ws.cell(row=row_idx, column=headers["VALOR"]).value
 
         if value_is_missing(section_value) and value_is_missing(label_value):
             continue
@@ -830,7 +1224,11 @@ def load_anthropometric_template_data(
             )
 
         section = normalize_lookup_label(str(section_value))
-        row = (str(label_value).strip(), value)
+        row_values = [
+            ws.cell(row=row_idx, column=col_idx).value
+            for col_idx in value_columns
+        ]
+        row = (str(label_value).strip(), row_values)
         if section == "RESUMEN":
             summary_rows_raw.append(row)
         elif section in {"MEDIDAS", "MEDIDA"}:
@@ -844,6 +1242,9 @@ def load_anthropometric_template_data(
         raise ValidationError(
             f"La hoja {ANTHRO_TEMPLATE_SHEET} debe incluir filas de RESUMEN y MEDIDAS"
         )
+
+    summary_rows_raw = normalize_anthro_rows(summary_rows_raw)
+    measurement_rows_raw = normalize_anthro_rows(measurement_rows_raw)
 
     return anthropometric_data_from_rows(
         patient=patient,
@@ -972,6 +1373,8 @@ def build_meal_example_texts(
             continue
 
         row_data = meal_rows[meal_name]
+        if is_guide_example_row(row_data):
+            continue
 
         fragments: List[str] = []
         for group_code in MEAL_EXAMPLE_ORDER.get(meal_name, meal_def["groups"]):
@@ -995,15 +1398,18 @@ def build_meal_example_texts(
             else:
                 fragments.append(build_example_fragment(food, serving_count))
 
-        if not fragments and not row_data.get("OBSERVACION", "") and not needs_example:
+        observation = row_data.get("OBSERVACION", "")
+        if not fragments and not observation and not needs_example:
             continue
 
-        example_text = "EJEMPLO:"
         if fragments:
-            example_text += " " + " + ".join(fragments)
-        observation = row_data.get("OBSERVACION", "")
-        if observation:
-            example_text += f" | {observation}"
+            example_text = "EJEMPLO: " + " + ".join(fragments)
+            if observation:
+                example_text += f" | {observation}"
+        elif needs_example and observation:
+            example_text = f"NOTA: {observation}"
+        else:
+            continue
         example_texts[meal_name] = example_text
 
     return example_texts
@@ -1155,6 +1561,18 @@ def make_issue(
     )
 
 
+def blocking_issues_for_sections(
+    issues: List[ValidationIssue],
+    sections: List[str] | tuple[str, ...] | set[str],
+) -> List[ValidationIssue]:
+    section_names = set(sections)
+    return [
+        issue
+        for issue in issues
+        if issue.section in section_names and issue.is_blocking
+    ]
+
+
 def format_actual_value(value) -> str:
     rendered = format_table_value(value)
     return rendered if rendered else "vacio"
@@ -1230,6 +1648,7 @@ def inspect_patient_info(wb, issues: List[ValidationIssue]) -> PatientInfo:
     ]
     for field_name, location, value in required_fields:
         if value_is_missing(value):
+            severity = "warning" if field_name == "Edad" else "error"
             issues.append(
                 make_issue(
                     section=SECTION_PATIENT,
@@ -1239,6 +1658,7 @@ def inspect_patient_info(wb, issues: List[ValidationIssue]) -> PatientInfo:
                     field=field_name,
                     expected="valor no vacio",
                     actual_value="vacio",
+                    severity=severity,
                 )
             )
 
@@ -1394,7 +1814,7 @@ def inspect_anthro_data(
 
     ws = wb[ANTHRO_TEMPLATE_SHEET]
     headers = build_sheet_headers(ws)
-    required_headers = ["SECCION", "ETIQUETA", "VALOR"]
+    required_headers = ["SECCION", "ETIQUETA"]
     missing_headers = [
         header for header in required_headers if header not in headers]
     if missing_headers:
@@ -1404,7 +1824,7 @@ def inspect_anthro_data(
                 message="Faltan columnas obligatorias en la hoja antropometrica.",
                 sheet=ANTHRO_TEMPLATE_SHEET,
                 field="columnas",
-                expected=", ".join(required_headers),
+                expected="SECCION, ETIQUETA y al menos una columna de valores desde la columna C",
                 actual_value=", ".join(
                     sorted(headers.keys())) or "sin encabezados",
             )
@@ -1412,17 +1832,27 @@ def inspect_anthro_data(
 
     section_col = headers.get("SECCION")
     label_col = headers.get("ETIQUETA")
-    value_col = headers.get("VALOR")
-    summary_rows_raw: List[Tuple[str, object]] = []
-    measurement_rows_raw: List[Tuple[str, object]] = []
+    value_columns = detect_anthro_value_columns(ws)
+    if not value_columns:
+        issues.append(
+            make_issue(
+                section=SECTION_ANTHRO,
+                message="La hoja antropometrica no tiene columnas de valores.",
+                sheet=ANTHRO_TEMPLATE_SHEET,
+                field="columnas",
+                expected="Al menos una columna de valores desde la columna C",
+                actual_value="sin columnas de valores",
+            )
+        )
+
+    summary_rows_raw: List[Tuple[str, List[object]]] = []
+    measurement_rows_raw: List[Tuple[str, List[object]]] = []
 
     for row_idx in range(2, ws.max_row + 1):
         section_value = ws.cell(
             row=row_idx, column=section_col).value if section_col else None
         label_value = ws.cell(
             row=row_idx, column=label_col).value if label_col else None
-        value = ws.cell(
-            row=row_idx, column=value_col).value if value_col else None
 
         if value_is_missing(section_value) and value_is_missing(label_value):
             continue
@@ -1456,7 +1886,11 @@ def inspect_anthro_data(
             continue
 
         section_name = normalize_lookup_label(str(section_value))
-        row = (str(label_value).strip(), value)
+        row_values = [
+            ws.cell(row=row_idx, column=col_idx).value
+            for col_idx in value_columns
+        ]
+        row = (str(label_value).strip(), row_values)
         if section_name == "RESUMEN":
             summary_rows_raw.append(row)
         elif section_name in {"MEDIDAS", "MEDIDA"}:
@@ -1474,6 +1908,10 @@ def inspect_anthro_data(
                 )
             )
 
+    summary_rows_raw, measurement_rows_raw = sanitize_anthro_rows(
+        summary_rows_raw,
+        measurement_rows_raw,
+    )
     summary_lookup = build_label_lookup_first(summary_rows_raw)
     measurement_lookup = build_label_lookup_first(measurement_rows_raw)
     missing_summary_labels = [
@@ -1504,26 +1942,20 @@ def inspect_anthro_data(
     anthro_data = AnthropometricReportData(
         patient=patient,
         peso_corporal_kg=format_decimal(
-            value_from_lookup(summary_lookup, ANTHRO_PESO_LABELS) or ""
+            value_from_lookup(summary_lookup, ANTHRO_PESO_LABELS)
         ),
         estatura_m=format_decimal(
-            value_from_lookup(measurement_lookup, ANTHRO_TALLA_M_LABELS) or ""
+            value_from_lookup(measurement_lookup, ANTHRO_TALLA_M_LABELS)
         ),
         masa_grasa_kg=format_decimal(
-            value_from_lookup(summary_lookup, ANTHRO_MASA_GRASA_LABELS) or ""
+            value_from_lookup(summary_lookup, ANTHRO_MASA_GRASA_LABELS)
         ),
         pct_grasa_carter=format_decimal(
             value_from_lookup(
-                summary_lookup, ANTHRO_PCT_GRASA_CARTER_LABELS) or ""
+                summary_lookup, ANTHRO_PCT_GRASA_CARTER_LABELS)
         ),
-        table_resumen=[
-            [format_table_value(label), format_table_value(value)]
-            for label, value in summary_rows_raw
-        ],
-        table_medidas=[
-            [format_table_value(label), format_table_value(value)]
-            for label, value in measurement_rows_raw
-        ],
+        table_resumen=build_display_anthro_rows(summary_rows_raw),
+        table_medidas=build_display_anthro_rows(measurement_rows_raw),
     )
 
     if not anthro_data.peso_corporal_kg:
@@ -1623,6 +2055,28 @@ def format_validation_summary(issues: List[ValidationIssue]) -> str:
     return f"No se puede generar: se encontraron {blocking_count} errores en el Excel."
 
 
+def format_validation_warning_summary(issues: List[ValidationIssue]) -> str:
+    ordered = ordered_issues(issues)
+    if not ordered:
+        return "El Excel se valido correctamente."
+
+    error_count = sum(1 for issue in ordered if issue.is_blocking)
+    warning_count = len(ordered) - error_count
+
+    if error_count and warning_count:
+        return (
+            f"Se generó el documento con {error_count} errores y "
+            f"{warning_count} advertencias detectadas en el Excel."
+        )
+    if error_count == 1:
+        return "Se generó el documento con 1 error detectado en el Excel."
+    if error_count > 1:
+        return f"Se generó el documento con {error_count} errores detectados en el Excel."
+    if warning_count == 1:
+        return "Se generó el documento con 1 advertencia detectada en el Excel."
+    return f"Se generó el documento con {warning_count} advertencias detectadas en el Excel."
+
+
 def build_issue_detail(issue: ValidationIssue) -> str:
     parts: List[str] = []
     if issue.sheet:
@@ -1692,6 +2146,10 @@ def build_validation_error_message(issues: List[ValidationIssue]) -> str:
     return format_validation_summary(issues) + "\n\n" + format_validation_report(issues)
 
 
+def build_validation_warning_message(issues: List[ValidationIssue]) -> str:
+    return format_validation_warning_summary(issues) + "\n\n" + format_validation_report(issues)
+
+
 def format_preview_text(data: ParsedWorkbookData) -> str:
     lines: List[str] = []
     lines.append("Paciente")
@@ -1733,16 +2191,20 @@ def format_preview_text(data: ParsedWorkbookData) -> str:
     lines.append("")
     lines.append("Resumen antropometrico")
     if data.anthro_data.table_resumen:
-        for label, value in data.anthro_data.table_resumen:
-            lines.append(f"- {label}: {value or 'vacio'}")
+        for row in data.anthro_data.table_resumen:
+            label = row[0]
+            values = [value or "vacio" for value in row[1:]]
+            lines.append(f"- {label}: {' | '.join(values) if values else 'vacio'}")
     else:
         lines.append("- Sin filas leidas")
 
     lines.append("")
     lines.append("Medidas antropometricas")
     if data.anthro_data.table_medidas:
-        for label, value in data.anthro_data.table_medidas:
-            lines.append(f"- {label}: {value or 'vacio'}")
+        for row in data.anthro_data.table_medidas:
+            label = row[0]
+            values = [value or "vacio" for value in row[1:]]
+            lines.append(f"- {label}: {' | '.join(values) if values else 'vacio'}")
     else:
         lines.append("- Sin filas leidas")
 

@@ -8,14 +8,13 @@ from datetime import date
 from pathlib import Path
 from typing import Callable
 
-from openpyxl import load_workbook
-
 from excel_helpers import (
     ParsedWorkbookData,
     ValidationError,
-    build_validation_error_message,
+    build_validation_warning_message,
     format_preview_text,
     inspect_workbook,
+    load_workbook_for_inspection,
 )
 from generate_anthro_pptx import generate_anthro_pptx
 from generate_pptx import generate_plan_pptx
@@ -40,10 +39,11 @@ class GenerationResult:
     patient_name: str
     documents: list[GeneratedDocument]
     preview_text: str = ""
+    validation_warnings: list[str] = field(default_factory=list)
 
     @property
     def warnings(self) -> list[str]:
-        warnings: list[str] = []
+        warnings: list[str] = list(self.validation_warnings)
         for document in self.documents:
             warnings.extend(document.errors)
         return warnings
@@ -96,14 +96,15 @@ def unique_stem(output_dir: Path, stem: str, suffixes: list[str]) -> str:
 
 def load_patient_name(excel_path: Path) -> str:
     inspection = inspect_excel_file(excel_path)
-    if inspection.has_blocking_issues:
-        raise ValidationError(build_validation_error_message(inspection.issues))
-    return inspection.patient.name
+    return inspection.patient.name or excel_path.stem
 
 
 def inspect_excel_file(excel_path: Path | str) -> ParsedWorkbookData:
-    wb = load_workbook(excel_path, data_only=True)
-    return inspect_workbook(wb)
+    wb = load_workbook_for_inspection(excel_path)
+    try:
+        return inspect_workbook(wb)
+    finally:
+        wb.close()
 
 
 def build_output_stems(output_dir: Path, patient_name: str) -> dict[str, str]:
@@ -146,11 +147,13 @@ def generate_all_documents(
     validate_inputs(excel_path, output_dir)
 
     inspection = parsed_data or inspect_excel_file(excel_path)
-    if inspection.has_blocking_issues:
-        raise ValidationError(build_validation_error_message(inspection.issues))
-
-    patient_name = inspection.patient.name
+    patient_name = inspection.patient.name or excel_path.stem
     stems = build_output_stems(output_dir, patient_name)
+    validation_warnings: list[str] = []
+    if inspection.issues:
+        validation_warnings.append(
+            build_validation_warning_message(inspection.issues)
+        )
     documents = [
         GeneratedDocument(label="Plan de Alimentación"),
         GeneratedDocument(label="Informe Antropométrico"),
@@ -228,4 +231,5 @@ def generate_all_documents(
         patient_name=patient_name,
         documents=documents,
         preview_text=format_preview_text(inspection),
+        validation_warnings=validation_warnings,
     )
