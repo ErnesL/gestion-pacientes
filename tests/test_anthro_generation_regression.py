@@ -335,6 +335,33 @@ def build_formula_based_anthro_workbook(path: Path) -> None:
     wb.save(path)
 
 
+def build_age_formula_workbook(path: Path) -> None:
+    wb = Workbook()
+
+    history = wb.active
+    history.title = "HISTORIA"
+    history["B2"] = datetime(2026, 3, 25)
+    history["C4"] = "Victoria Juliac"
+    history["C5"] = "30322716"
+    history["C6"] = datetime(2002, 9, 24)
+    history["C7"] = "=(B2-C6)/365"
+    history["C10"] = "Femenino"
+    history["I8"] = "Fitness"
+
+    plan = wb.create_sheet("PLAN_ALIMENTACION_TEMPLATE")
+    plan.append(PLAN_HEADERS)
+    plan.append(["DES", 1, 0, 1, 2, 1, 1])
+
+    anthro = wb.create_sheet("ANTROPOMETRIA_TEMPLATE")
+    anthro.append(["SECCION", "ETIQUETA", "VALOR"])
+    for label, value in SUMMARY_ROWS:
+        anthro.append(["RESUMEN", label, value])
+    for label, value in MEASUREMENT_ROWS:
+        anthro.append(["MEDIDAS", label, value])
+
+    wb.save(path)
+
+
 def build_workbook_with_blank_optional_rows(path: Path) -> None:
     wb = Workbook()
 
@@ -520,6 +547,21 @@ class AnthroGenerationRegressionTest(unittest.TestCase):
 
             self.assertEqual(generated_path, output_path)
             self.assertTrue(output_path.exists())
+
+    def test_age_uses_calendar_years_when_formula_cache_is_missing(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            temp_dir = Path(tmpdir)
+            excel_path = temp_dir / "Historia ClÃ­nica - Formula Edad.xlsx"
+            build_age_formula_workbook(excel_path)
+
+            workbook = load_workbook_for_inspection(excel_path)
+            try:
+                parsed_data = inspect_workbook(workbook)
+            finally:
+                workbook.close()
+
+            self.assertFalse(parsed_data.has_blocking_issues)
+            self.assertEqual(parsed_data.patient.age, "23")
 
     def test_generation_keeps_blank_value_rows_without_inflating_table_height(self) -> None:
         with TemporaryDirectory() as tmpdir:

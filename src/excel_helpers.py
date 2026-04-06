@@ -368,19 +368,37 @@ def format_quantity(value: float) -> str:
     return f"{value:.2f}".rstrip("0").rstrip(".")
 
 
+def _coerce_excel_date(value) -> date | None:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return None
+
+
+def resolve_patient_age(ws) -> str:
+    evaluation_date = _coerce_excel_date(ws["B2"].value)
+    birth_date = _coerce_excel_date(ws["C6"].value)
+    if evaluation_date is not None and birth_date is not None:
+        years = evaluation_date.year - birth_date.year
+        if (evaluation_date.month, evaluation_date.day) < (
+            birth_date.month,
+            birth_date.day,
+        ):
+            years -= 1
+        if years >= 0:
+            return str(years)
+
+    return to_age_text(ws["C7"].value)
+
+
 def load_patient_info(wb) -> PatientInfo:
     ws = require_sheet(wb, "HISTORIA")
     name = str(ws["C4"].value or "").strip()
     ci = str(ws["C5"].value or "").strip()
-    age_val = ws["C7"].value
     sex = str(ws["C10"].value or "").strip()
     discipline = str(ws["I8"].value or "").strip()
-
-    age = ""
-    if isinstance(age_val, (int, float)):
-        age = str(int(round(age_val)))
-    elif age_val:
-        age = str(age_val)
+    age = resolve_patient_age(ws)
 
     missing = []
     if not name:
@@ -414,7 +432,7 @@ def value_is_missing(value) -> bool:
 
 def to_age_text(value) -> str:
     if isinstance(value, (int, float)):
-        return str(int(round(value)))
+        return str(int(value))
     if value is None:
         return ""
     text = str(value).strip()
@@ -1638,7 +1656,7 @@ def inspect_patient_info(wb, issues: List[ValidationIssue]) -> PatientInfo:
     ci = str(ws["C5"].value or "").strip()
     sex = str(ws["C10"].value or "").strip()
     discipline = str(ws["I8"].value or "").strip()
-    age = to_age_text(ws["C7"].value)
+    age = resolve_patient_age(ws)
 
     required_fields = [
         ("Nombre y Apellido", "C4", name),
