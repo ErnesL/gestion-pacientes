@@ -10,7 +10,12 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
-from app_support import GenerationResult, generate_all_documents, inspect_excel_file
+from app_support import (
+    GenerationResult,
+    default_output_dir_for_excel,
+    generate_all_documents,
+    inspect_excel_file,
+)
 from excel_helpers import format_preview_text
 
 
@@ -30,11 +35,13 @@ class GestionPacientesApp:
 
         self.queue: queue.Queue[WorkerMessage] = queue.Queue()
         self.worker_running = False
+        self._syncing_output_dir = False
+        self._auto_output_dir: Path | None = None
 
         self.excel_var = tk.StringVar()
         self.output_dir_var = tk.StringVar()
         self.status_var = tk.StringVar(
-            value="Selecciona un Excel y una carpeta destino.")
+            value="Selecciona un Excel. La carpeta destino se tomara automaticamente desde su ubicacion.")
 
         self._build_ui()
         self._refresh_generate_button()
@@ -55,7 +62,7 @@ class GestionPacientesApp:
 
         subtitle = ttk.Label(
             frame,
-            text="La aplicacion genera el plan de alimentacion y el informe antropometrico en PPTX y PDF.",
+            text="La aplicacion genera el plan de alimentacion y el informe antropometrico en PPTX y PDF. Por defecto, guarda los archivos en la misma carpeta del Excel seleccionado.",
             wraplength=700,
         )
         subtitle.grid(row=1, column=0, columnspan=3, sticky="w", pady=(6, 18))
@@ -68,12 +75,12 @@ class GestionPacientesApp:
         ttk.Button(frame, text="Examinar...", command=self._choose_excel).grid(
             row=2, column=2, sticky="ew", pady=(0, 8))
 
-        ttk.Label(frame, text="Carpeta destino").grid(
+        ttk.Label(frame, text="Carpeta destino (automatica)").grid(
             row=3, column=0, sticky="w", pady=(0, 12))
         output_entry = ttk.Entry(frame, textvariable=self.output_dir_var)
         output_entry.grid(row=3, column=1, sticky="ew",
                           pady=(0, 12), padx=(12, 12))
-        ttk.Button(frame, text="Examinar...", command=self._choose_output_dir).grid(
+        ttk.Button(frame, text="Cambiar...", command=self._choose_output_dir).grid(
             row=3, column=2, sticky="ew", pady=(0, 12))
 
         status_frame = ttk.LabelFrame(frame, text="Estado", padding=12)
@@ -122,10 +129,9 @@ class GestionPacientesApp:
         )
         self.generate_button.grid(row=5, column=2, sticky="e", pady=(14, 0))
 
-        self.excel_var.trace_add(
-            "write", lambda *_: self._refresh_generate_button())
+        self.excel_var.trace_add("write", lambda *_: self._on_excel_path_changed())
         self.output_dir_var.trace_add(
-            "write", lambda *_: self._refresh_generate_button())
+            "write", lambda *_: self._on_output_dir_changed())
 
     def _choose_excel(self) -> None:
         path = filedialog.askopenfilename(
@@ -135,6 +141,7 @@ class GestionPacientesApp:
         )
         if path:
             self.excel_var.set(path)
+            self._sync_output_dir_with_excel(force=True)
             self._refresh_preview_from_selected_excel()
 
     def _choose_output_dir(self) -> None:
@@ -142,11 +149,44 @@ class GestionPacientesApp:
         if path:
             self.output_dir_var.set(path)
 
+    def _on_excel_path_changed(self) -> None:
+        self._sync_output_dir_with_excel()
+        self._refresh_generate_button()
+
+    def _on_output_dir_changed(self) -> None:
+        if self._syncing_output_dir:
+            return
+        self._auto_output_dir = None
+        self._refresh_generate_button()
+
+    def _sync_output_dir_with_excel(self, force: bool = False) -> None:
+        excel_path_text = self.excel_var.get().strip()
+        if not excel_path_text:
+            return
+
+        suggested_output_dir = default_output_dir_for_excel(excel_path_text)
+        current_output_text = self.output_dir_var.get().strip()
+        current_output_dir = Path(current_output_text) if current_output_text else None
+
+        should_update = (
+            force
+            or not current_output_text
+            or current_output_dir == self._auto_output_dir
+        )
+        if not should_update:
+            return
+
+        self._syncing_output_dir = True
+        try:
+            self.output_dir_var.set(str(suggested_output_dir))
+            self._auto_output_dir = suggested_output_dir
+        finally:
+            self._syncing_output_dir = False
+
     def _refresh_generate_button(self) -> None:
         can_generate = (
             not self.worker_running
             and bool(self.excel_var.get().strip())
-            and bool(self.output_dir_var.get().strip())
         )
         self.generate_button.state(
             ["!disabled"] if can_generate else ["disabled"])
@@ -187,7 +227,9 @@ class GestionPacientesApp:
         if inspection.has_blocking_issues:
             self.status_var.set("Se detectaron errores en el Excel.")
         else:
-            self.status_var.set("Excel validado. Listo para generar.")
+            self.status_var.set(
+                "Excel validado. El destino quedo listo en la misma carpeta."
+            )
 
     def _set_idle_status(self, text: str) -> None:
         self.worker_running = False
@@ -196,7 +238,12 @@ class GestionPacientesApp:
 
     def _start_generation(self) -> None:
         excel_path = Path(self.excel_var.get().strip())
-        output_dir = Path(self.output_dir_var.get().strip())
+        output_dir_text = self.output_dir_var.get().strip()
+        output_dir = (
+            Path(output_dir_text)
+            if output_dir_text
+            else default_output_dir_for_excel(excel_path)
+        )
 
         self.worker_running = True
         self._refresh_generate_button()

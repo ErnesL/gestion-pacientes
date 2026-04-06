@@ -107,6 +107,10 @@ def inspect_excel_file(excel_path: Path | str) -> ParsedWorkbookData:
         wb.close()
 
 
+def default_output_dir_for_excel(excel_path: Path | str) -> Path:
+    return Path(excel_path).parent
+
+
 def build_output_stems(output_dir: Path, patient_name: str) -> dict[str, str]:
     safe_name = sanitize_filename_component(patient_name)
     plan_stem = unique_stem(
@@ -134,13 +138,17 @@ def validate_inputs(excel_path: Path, output_dir: Path) -> None:
 
 def generate_all_documents(
     excel_path: Path | str,
-    output_dir: Path | str,
+    output_dir: Path | str | None,
     log: Callable[[str], None],
     today: date | None = None,
     parsed_data: ParsedWorkbookData | None = None,
 ) -> GenerationResult:
     excel_path = Path(excel_path)
-    output_dir = Path(output_dir)
+    output_dir = (
+        default_output_dir_for_excel(excel_path)
+        if output_dir is None
+        else Path(output_dir)
+    )
     template_paths = get_template_paths()
 
     log("Validando rutas y templates")
