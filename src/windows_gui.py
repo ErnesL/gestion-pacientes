@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import queue
 import threading
 import traceback
@@ -275,6 +276,20 @@ class GestionPacientesApp:
             result = message.result
             self._render_result(result)
 
+    def _open_generated_pptxs(self, result: GenerationResult) -> list[str]:
+        open_warnings: list[str] = []
+        for document in result.documents:
+            if document.pptx_path is None:
+                continue
+            try:
+                os.startfile(str(document.pptx_path))
+                self._append_log(f"- Abierto automaticamente: {document.pptx_path}")
+            except OSError as exc:
+                open_warnings.append(
+                    f"No se pudo abrir automaticamente {document.label}: {exc}"
+                )
+        return open_warnings
+
     def _render_result(self, result: GenerationResult) -> None:
         success_lines: list[str] = []
 
@@ -288,12 +303,14 @@ class GestionPacientesApp:
             if document.pdf_path is not None:
                 success_lines.append(
                     f"{document.label} PDF: {document.pdf_path}")
-        warning_lines = result.warnings
+        warning_lines = list(result.warnings)
 
         if success_lines:
             self._append_log("Archivos generados:")
             for line in success_lines:
                 self._append_log(f"- {line}")
+            self._append_log("Abriendo PPTX generados...")
+            warning_lines.extend(self._open_generated_pptxs(result))
 
         if warning_lines:
             self._append_log("Advertencias:")
