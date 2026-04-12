@@ -410,6 +410,7 @@ class AnthroGenerationRegressionTest(unittest.TestCase):
 
             self.assertFalse(parsed_data.has_blocking_issues)
             self.assertEqual(parsed_data.anthro_data.pct_grasa_carter, "26,03")
+            self.assertEqual(parsed_data.anthro_data.masa_magra_kg, "54,07")
 
             generated_path = generate_anthro_pptx(
                 excel_path=excel_path,
@@ -432,6 +433,7 @@ class AnthroGenerationRegressionTest(unittest.TestCase):
 
             self.assertFalse(parsed_data.has_blocking_issues)
             self.assertEqual(parsed_data.anthro_data.peso_corporal_kg, "71,80")
+            self.assertEqual(parsed_data.anthro_data.masa_magra_kg, "55,43")
             self.assertEqual(parsed_data.anthro_data.pct_grasa_carter, "22,80")
             self.assertEqual(
                 parsed_data.anthro_data.table_resumen[0],
@@ -470,8 +472,15 @@ class AnthroGenerationRegressionTest(unittest.TestCase):
             slide_text = "\n".join(
                 shape.text for shape in presentation.slides[2].shapes if hasattr(shape, "text")
             )
+            masa_magra_text = next(
+                shape.text
+                for shape in presentation.slides[2].shapes
+                if hasattr(shape, "text") and "masa magra" in shape.text.lower()
+            )
             self.assertIn("71,80", slide_text)
             self.assertIn("22,80", slide_text)
+            self.assertIn("55,43 Kg", masa_magra_text)
+            self.assertNotIn("16,37 Kg", masa_magra_text)
 
     def test_generation_ignores_invalid_trailing_controls_and_allows_missing_age(self) -> None:
         with TemporaryDirectory() as tmpdir:

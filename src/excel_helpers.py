@@ -28,6 +28,7 @@ class AnthropometricReportData:
     patient: PatientInfo
     peso_corporal_kg: str
     estatura_m: str
+    masa_magra_kg: str
     masa_grasa_kg: str
     pct_grasa_carter: str
     table_resumen: List[List[str]]
@@ -972,6 +973,8 @@ ANTHRO_PESO_LABELS = [
 
 ANTHRO_TALLA_M_LABELS = ["Talla (m)"]
 
+ANTHRO_MASA_MAGRA_LABELS = ["Kg de Masa Magra"]
+
 ANTHRO_MASA_GRASA_LABELS = ["Kg de Grasa"]
 
 ANTHRO_PCT_GRASA_CARTER_LABELS = [
@@ -986,6 +989,7 @@ ANTHRO_REQUIRED_VALUE_SUMMARY_FIELDS = [
     ("Peso (Kg)", ANTHRO_PESO_LABELS, "positive_number"),
     ("Talla parada (cm)", ["Talla parada (cm)"], "positive_number"),
     ("% Grasa (Carter 1986)", ANTHRO_PCT_GRASA_CARTER_LABELS, "positive_number"),
+    ("Kg de Masa Magra", ANTHRO_MASA_MAGRA_LABELS, "positive_number"),
     ("Kg de Grasa", ANTHRO_MASA_GRASA_LABELS, "positive_number"),
 ]
 
@@ -1182,6 +1186,13 @@ def anthropometric_data_from_rows(
             "Falta campo: Talla (m) en la tabla de medidas antropométricas"
         )
 
+    masa_magra_value = value_from_lookup(
+        summary_lookup, ANTHRO_MASA_MAGRA_LABELS)
+    if value_is_missing(masa_magra_value):
+        raise ValidationError(
+            "Falta campo: Kg de Masa Magra en la tabla resumen antropomÃ©trica"
+        )
+
     masa_grasa_value = value_from_lookup(
         summary_lookup, ANTHRO_MASA_GRASA_LABELS)
     if value_is_missing(masa_grasa_value):
@@ -1200,6 +1211,7 @@ def anthropometric_data_from_rows(
         patient=patient,
         peso_corporal_kg=format_decimal(peso_corporal_value),
         estatura_m=format_decimal(estatura_value),
+        masa_magra_kg=format_decimal(masa_magra_value),
         masa_grasa_kg=format_decimal(masa_grasa_value),
         pct_grasa_carter=format_decimal(pct_grasa_value),
         table_resumen=build_display_anthro_rows(summary_rows_raw),
@@ -1293,6 +1305,7 @@ def build_anthropometric_replacements(
         "{{OBJETIVO}}": "PERDER GRASA",
         "{{PESO_CORPORAL_KG}}": data.peso_corporal_kg,
         "{{ESTATURA_M}}": data.estatura_m,
+        "{{MASA_MAGRA_KG}}": data.masa_magra_kg,
         "{{MASA_GRASA_KG}}": data.masa_grasa_kg,
         "{{PCT_GRASA_CARTER}}": data.pct_grasa_carter,
         "{{MES_ACTUAL}}": month_name_es(today),
@@ -1550,6 +1563,7 @@ def blank_anthro_data(patient: PatientInfo) -> AnthropometricReportData:
         patient=patient,
         peso_corporal_kg="",
         estatura_m="",
+        masa_magra_kg="",
         masa_grasa_kg="",
         pct_grasa_carter="",
         table_resumen=[],
@@ -1965,6 +1979,9 @@ def inspect_anthro_data(
         estatura_m=format_decimal(
             value_from_lookup(measurement_lookup, ANTHRO_TALLA_M_LABELS)
         ),
+        masa_magra_kg=format_decimal(
+            value_from_lookup(summary_lookup, ANTHRO_MASA_MAGRA_LABELS)
+        ),
         masa_grasa_kg=format_decimal(
             value_from_lookup(summary_lookup, ANTHRO_MASA_GRASA_LABELS)
         ),
@@ -1993,6 +2010,16 @@ def inspect_anthro_data(
                 message="No se pudo leer la talla en metros.",
                 sheet=ANTHRO_TEMPLATE_SHEET,
                 field="Talla (m)",
+                expected="valor numerico",
+            )
+        )
+    if not anthro_data.masa_magra_kg:
+        issues.append(
+            make_issue(
+                section=SECTION_ANTHRO,
+                message="No se pudo leer Kg de Masa Magra.",
+                sheet=ANTHRO_TEMPLATE_SHEET,
+                field="Kg de Masa Magra",
                 expected="valor numerico",
             )
         )
@@ -2202,6 +2229,7 @@ def format_preview_text(data: ParsedWorkbookData) -> str:
     lines.append("Antropometria leida")
     lines.append(f"- Peso: {data.anthro_data.peso_corporal_kg or 'vacio'}")
     lines.append(f"- Talla: {data.anthro_data.estatura_m or 'vacio'}")
+    lines.append(f"- Kg masa magra: {data.anthro_data.masa_magra_kg or 'vacio'}")
     lines.append(f"- Kg grasa: {data.anthro_data.masa_grasa_kg or 'vacio'}")
     lines.append(
         f"- % grasa Carter: {data.anthro_data.pct_grasa_carter or 'vacio'}")
