@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import sys
 import unittest
+import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -15,6 +17,10 @@ if str(SRC_DIR) not in sys.path:
 
 from excel_helpers import inspect_workbook, load_workbook_for_inspection
 from generate_pptx import generate_plan_pptx
+
+PPTX_XML_NS = {
+    "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+}
 
 
 def build_workbook_with_valid_plan_and_blank_anthro(path: Path) -> None:
@@ -93,6 +99,59 @@ def add_observation_only_examples_sheet(path: Path) -> None:
     )
     examples.append(["DES", None, None, None, None, None, None, "Ajustar segun tolerancia del paciente."])
     wb.save(path)
+
+
+def add_actual_examples_sheet(path: Path) -> None:
+    wb = load_workbook(path)
+    examples = wb.create_sheet("EJEMPLOS_COMIDAS")
+    examples.append(
+        [
+            "COMIDA",
+            "LACTEOS",
+            "VEGETALES",
+            "FRUTAS",
+            "ALMIDONES",
+            "PROTEINAS",
+            "GRASAS",
+            "OBSERVACION",
+        ]
+    )
+    examples.append(
+        [
+            "DES",
+            None,
+            None,
+            "FRUTA_PRUEBA",
+            "ALMIDON_PRUEBA",
+            "PROTEINA_PRUEBA",
+            "GRASA_PRUEBA",
+            None,
+        ]
+    )
+    wb.save(path)
+
+
+def find_example_runs(path: Path, marker: str) -> list[str]:
+    with zipfile.ZipFile(path) as pptx_file:
+        slide_names = sorted(
+            name
+            for name in pptx_file.namelist()
+            if name.startswith("ppt/slides/slide") and name.endswith(".xml")
+        )
+        for slide_name in slide_names:
+            root = ET.fromstring(pptx_file.read(slide_name))
+            for paragraph in root.findall(".//a:p", PPTX_XML_NS):
+                runs = []
+                for run in paragraph.findall("a:r", PPTX_XML_NS):
+                    text = "".join(
+                        node.text or "" for node in run.findall("a:t", PPTX_XML_NS)
+                    )
+                    if text:
+                        runs.append(text)
+                full_text = "".join(runs)
+                if full_text.startswith("EJEMPLO:") and marker in full_text:
+                    return runs
+    return []
 
 
 def build_formula_based_plan_workbook(path: Path) -> None:
@@ -260,6 +319,25 @@ class PlanGenerationRegressionTest(unittest.TestCase):
             )
             self.assertNotIn("EJEMPLO: |", meal_slide_text)
             self.assertIn("NOTA:", meal_slide_text)
+
+    def test_plan_generation_keeps_example_body_out_of_prefix_run(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            temp_dir = Path(tmpdir)
+            excel_path = temp_dir / "Historia ClÃ­nica - Aaron Lopez.xlsx"
+            output_path = temp_dir / "Plan Alimentacion.pptx"
+            build_workbook_with_valid_plan_and_blank_anthro(excel_path)
+            add_actual_examples_sheet(excel_path)
+
+            generated_path = generate_plan_pptx(
+                excel_path=excel_path,
+                output_path=output_path,
+            )
+
+            self.assertEqual(generated_path, output_path)
+            example_runs = find_example_runs(output_path, "FRUTA_PRUEBA")
+            self.assertGreaterEqual(len(example_runs), 2)
+            self.assertEqual(example_runs[0], "EJEMPLO: ")
+            self.assertIn("FRUTA_PRUEBA", example_runs[1])
 
     def test_formula_based_plan_inspection_and_generation_without_cached_values(self) -> None:
         with TemporaryDirectory() as tmpdir:

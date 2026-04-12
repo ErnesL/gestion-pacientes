@@ -27,6 +27,10 @@ STACK_MARKER_RE = re.compile(
     re.IGNORECASE,
 )
 STACK_GAP = 120_000
+EXAMPLE_PREFIX_RE = re.compile(
+    r"^(?P<prefix>(?:EJEMPLO|NOTA):\s*)(?P<body>.*)$",
+    re.IGNORECASE,
+)
 
 GROUP_LABELS = {
     "LACTEOS": "LACTEOS",
@@ -96,6 +100,13 @@ def set_text_frame_text(text_frame, text: str) -> None:
         return
 
     first_paragraph = text_frame.paragraphs[0]
+    if set_prefixed_text_frame_text(first_paragraph, text):
+        for paragraph in text_frame.paragraphs[1:]:
+            for run in paragraph.runs:
+                run.text = ""
+        remove_empty_paragraphs(text_frame)
+        return
+
     if first_paragraph.runs:
         first_paragraph.runs[0].text = text
         for run in first_paragraph.runs[1:]:
@@ -107,6 +118,19 @@ def set_text_frame_text(text_frame, text: str) -> None:
         for run in paragraph.runs:
             run.text = ""
     remove_empty_paragraphs(text_frame)
+
+
+def set_prefixed_text_frame_text(paragraph, text: str) -> bool:
+    match = EXAMPLE_PREFIX_RE.match(text)
+    if match is None or len(paragraph.runs) < 2:
+        return False
+
+    # Keep the template's distinct styles for the prefix and example body.
+    paragraph.runs[0].text = match.group("prefix")
+    paragraph.runs[1].text = match.group("body")
+    for run in paragraph.runs[2:]:
+        run.text = ""
+    return True
 
 
 def remove_empty_paragraphs(text_frame) -> None:
