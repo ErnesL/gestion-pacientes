@@ -16,6 +16,7 @@ from app_support import (
     generate_all_documents,
     get_template_paths,
     inspect_excel_file,
+    resolve_app_root,
 )
 from excel_helpers import format_preview_text
 
@@ -73,6 +74,11 @@ class GestionPacientesApp:
         template_menu.add_command(
             label="Informe antropometrico (base)",
             command=lambda: self._open_template_pptx("anthro"),
+        )
+        template_menu.add_separator()
+        template_menu.add_command(
+            label="Carpeta del programa (actualizar plantillas PPTX)",
+            command=self._open_app_install_folder,
         )
         template_menu_btn.configure(menu=template_menu)
         template_menu_btn.grid(row=0, column=2, sticky="e")
@@ -170,6 +176,22 @@ class GestionPacientesApp:
         except OSError as exc:
             messagebox.showerror(
                 "No se pudo abrir la plantilla",
+                str(exc),
+            )
+
+    def _open_app_install_folder(self) -> None:
+        root_dir = resolve_app_root()
+        if not root_dir.exists():
+            messagebox.showerror(
+                "Carpeta no encontrada",
+                f"No existe la carpeta del programa:\n{root_dir}",
+            )
+            return
+        try:
+            os.startfile(str(root_dir))
+        except OSError as exc:
+            messagebox.showerror(
+                "No se pudo abrir la carpeta",
                 str(exc),
             )
 
