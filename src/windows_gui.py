@@ -14,6 +14,7 @@ from app_support import (
     GenerationResult,
     default_output_dir_for_excel,
     generate_all_documents,
+    get_template_paths,
     inspect_excel_file,
 )
 from excel_helpers import format_preview_text
@@ -58,7 +59,23 @@ class GestionPacientesApp:
             text="Generacion de PPTX y PDF",
             font=("Segoe UI", 16, "bold"),
         )
-        title.grid(row=0, column=0, columnspan=3, sticky="w")
+        title.grid(row=0, column=0, columnspan=2, sticky="w")
+
+        template_menu_btn = ttk.Menubutton(
+            frame,
+            text="Abrir plantilla PPTX...",
+        )
+        template_menu = tk.Menu(template_menu_btn, tearoff=0)
+        template_menu.add_command(
+            label="Plan de alimentacion (base)",
+            command=lambda: self._open_template_pptx("plan"),
+        )
+        template_menu.add_command(
+            label="Informe antropometrico (base)",
+            command=lambda: self._open_template_pptx("anthro"),
+        )
+        template_menu_btn.configure(menu=template_menu)
+        template_menu_btn.grid(row=0, column=2, sticky="e")
 
         subtitle = ttk.Label(
             frame,
@@ -132,6 +149,29 @@ class GestionPacientesApp:
         self.excel_var.trace_add("write", lambda *_: self._on_excel_path_changed())
         self.output_dir_var.trace_add(
             "write", lambda *_: self._on_output_dir_changed())
+
+    def _open_template_pptx(self, key: str) -> None:
+        paths = get_template_paths()
+        path = paths.get(key)
+        if path is None:
+            messagebox.showerror(
+                "Plantilla no encontrada",
+                f"No hay plantilla definida para {key!r}.",
+            )
+            return
+        if not path.exists():
+            messagebox.showerror(
+                "Plantilla no encontrada",
+                f"No existe el archivo:\n{path}",
+            )
+            return
+        try:
+            os.startfile(str(path))
+        except OSError as exc:
+            messagebox.showerror(
+                "No se pudo abrir la plantilla",
+                str(exc),
+            )
 
     def _choose_excel(self) -> None:
         path = filedialog.askopenfilename(
